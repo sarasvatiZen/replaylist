@@ -1,0 +1,22 @@
+# ===== 環境変数・秘密鍵 =====
+.env
+*.env
+keys/
+
+# ===== Rust (Backend) =====
+/backend/target/
+/backend/Cargo.lock
+
+# ===== Elm / Frontend =====
+/frontend/elm-stuff/
+/frontend/dist/
+/frontend/node_modules/
+
+# ===== OS・エディタ関連 =====
+.DS_Store
+.idea/
+.vscode/
+
+# ===== その他 =====
+/logs/
+/tmp/
