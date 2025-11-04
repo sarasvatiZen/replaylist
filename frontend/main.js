@@ -5361,10 +5361,9 @@ var $elm$core$Task$perform = F2(
 				A2($elm$core$Task$map, toMessage, task)));
 	});
 var $elm$browser$Browser$application = _Browser_application;
-var $author$project$Main$Amazon = {$: 'Amazon'};
 var $author$project$Main$Apple = {$: 'Apple'};
 var $author$project$Main$Home = {$: 'Home'};
-var $author$project$Main$Youtube = {$: 'Youtube'};
+var $author$project$Main$Spotify = {$: 'Spotify'};
 var $elm$core$Dict$RBEmpty_elm_builtin = {$: 'RBEmpty_elm_builtin'};
 var $elm$core$Dict$empty = $elm$core$Dict$RBEmpty_elm_builtin;
 var $author$project$Main$GotLoginStatus = function (a) {
@@ -6181,7 +6180,82 @@ var $author$project$Main$fetchLoginStatus = $elm$http$Http$get(
 		expect: A2($elm$http$Http$expectJson, $author$project$Main$GotLoginStatus, $author$project$Main$loginStatusDecoder),
 		url: '/api/login/status'
 	});
-var $author$project$Main$Spotify = {$: 'Spotify'};
+var $elm$core$List$drop = F2(
+	function (n, list) {
+		drop:
+		while (true) {
+			if (n <= 0) {
+				return list;
+			} else {
+				if (!list.b) {
+					return list;
+				} else {
+					var x = list.a;
+					var xs = list.b;
+					var $temp$n = n - 1,
+						$temp$list = xs;
+					n = $temp$n;
+					list = $temp$list;
+					continue drop;
+				}
+			}
+		}
+	});
+var $elm$core$List$head = function (list) {
+	if (list.b) {
+		var x = list.a;
+		var xs = list.b;
+		return $elm$core$Maybe$Just(x);
+	} else {
+		return $elm$core$Maybe$Nothing;
+	}
+};
+var $elm_community$list_extra$List$Extra$getAt = F2(
+	function (idx, xs) {
+		return (idx < 0) ? $elm$core$Maybe$Nothing : $elm$core$List$head(
+			A2($elm$core$List$drop, idx, xs));
+	});
+var $author$project$Main$Amazon = {$: 'Amazon'};
+var $author$project$Main$Youtube = {$: 'Youtube'};
+var $elm$core$Maybe$andThen = F2(
+	function (callback, maybeValue) {
+		if (maybeValue.$ === 'Just') {
+			var value = maybeValue.a;
+			return callback(value);
+		} else {
+			return $elm$core$Maybe$Nothing;
+		}
+	});
+var $author$project$Main$serviceFromKey = function (k) {
+	switch (k) {
+		case 'apple':
+			return $elm$core$Maybe$Just($author$project$Main$Apple);
+		case 'spotify':
+			return $elm$core$Maybe$Just($author$project$Main$Spotify);
+		case 'youtube':
+			return $elm$core$Maybe$Just($author$project$Main$Youtube);
+		case 'amazon':
+			return $elm$core$Maybe$Just($author$project$Main$Amazon);
+		default:
+			return $elm$core$Maybe$Nothing;
+	}
+};
+var $author$project$Main$decodeList = function (s) {
+	return A2(
+		$elm$core$List$filterMap,
+		$author$project$Main$serviceFromKey,
+		A2($elm$core$String$split, ',', s));
+};
+var $elm$core$Maybe$map = F2(
+	function (f, maybe) {
+		if (maybe.$ === 'Just') {
+			var value = maybe.a;
+			return $elm$core$Maybe$Just(
+				f(value));
+		} else {
+			return $elm$core$Maybe$Nothing;
+		}
+	});
 var $elm$url$Url$Parser$State = F5(
 	function (visited, unvisited, params, frag, value) {
 		return {frag: frag, params: params, unvisited: unvisited, value: value, visited: visited};
@@ -6402,70 +6476,52 @@ var $elm$url$Url$Parser$top = $elm$url$Url$Parser$Parser(
 		return _List_fromArray(
 			[state]);
 	});
-var $author$project$Main$parseFromTo = function (url) {
-	var toType = function (k) {
-		_v1$4:
-		while (true) {
-			if (k.$ === 'Just') {
-				switch (k.a) {
-					case 'apple':
-						return $author$project$Main$Apple;
-					case 'spotify':
-						return $author$project$Main$Spotify;
-					case 'youtube':
-						return $author$project$Main$Youtube;
-					case 'amazon':
-						return $author$project$Main$Amazon;
-					default:
-						break _v1$4;
-				}
-			} else {
-				break _v1$4;
-			}
-		}
-		return $author$project$Main$Spotify;
-	};
-	var fromType = function (k) {
-		_v0$4:
-		while (true) {
-			if (k.$ === 'Just') {
-				switch (k.a) {
-					case 'apple':
-						return $author$project$Main$Apple;
-					case 'spotify':
-						return $author$project$Main$Spotify;
-					case 'youtube':
-						return $author$project$Main$Youtube;
-					case 'amazon':
-						return $author$project$Main$Amazon;
-					default:
-						break _v0$4;
-				}
-			} else {
-				break _v0$4;
-			}
-		}
-		return $author$project$Main$Apple;
-	};
-	var toK = function (q) {
-		return A2(
+var $author$project$Main$parseState = function (url) {
+	var rightS = A2(
+		$elm$core$Maybe$withDefault,
+		$elm$core$Maybe$Nothing,
+		A2(
 			$elm$url$Url$Parser$parse,
-			A2($elm$url$Url$Parser$questionMark, $elm$url$Url$Parser$top, q),
-			url);
-	}(
-		$elm$url$Url$Parser$Query$string('to'));
-	var fromK = function (q) {
-		return A2(
+			A2(
+				$elm$url$Url$Parser$questionMark,
+				$elm$url$Url$Parser$top,
+				$elm$url$Url$Parser$Query$string('right')),
+			url));
+	var rightL = A2(
+		$elm$core$Maybe$withDefault,
+		_List_fromArray(
+			[$author$project$Main$Spotify]),
+		A2($elm$core$Maybe$map, $author$project$Main$decodeList, rightS));
+	var liS = A2(
+		$elm$core$Maybe$withDefault,
+		$elm$core$Maybe$Nothing,
+		A2(
 			$elm$url$Url$Parser$parse,
-			A2($elm$url$Url$Parser$questionMark, $elm$url$Url$Parser$top, q),
-			url);
-	}(
-		$elm$url$Url$Parser$Query$string('from'));
-	return _Utils_Tuple2(
-		fromType(
-			A2($elm$core$Maybe$withDefault, $elm$core$Maybe$Nothing, fromK)),
-		toType(
-			A2($elm$core$Maybe$withDefault, $elm$core$Maybe$Nothing, toK)));
+			A2(
+				$elm$url$Url$Parser$questionMark,
+				$elm$url$Url$Parser$top,
+				$elm$url$Url$Parser$Query$string('li')),
+			url));
+	var li = A2(
+		$elm$core$Maybe$withDefault,
+		1,
+		A2($elm$core$Maybe$andThen, $elm$core$String$toInt, liS));
+	var leftS = A2(
+		$elm$core$Maybe$withDefault,
+		$elm$core$Maybe$Nothing,
+		A2(
+			$elm$url$Url$Parser$parse,
+			A2(
+				$elm$url$Url$Parser$questionMark,
+				$elm$url$Url$Parser$top,
+				$elm$url$Url$Parser$Query$string('left')),
+			url));
+	var leftL = A2(
+		$elm$core$Maybe$withDefault,
+		_List_fromArray(
+			[$author$project$Main$Youtube, $author$project$Main$Apple, $author$project$Main$Amazon]),
+		A2($elm$core$Maybe$map, $author$project$Main$decodeList, leftS));
+	return _Utils_Tuple3(leftL, rightL, li);
 };
 var $author$project$Main$serviceFromType = function (sType) {
 	switch (sType.$) {
@@ -6481,32 +6537,61 @@ var $author$project$Main$serviceFromType = function (sType) {
 };
 var $author$project$Main$init = F3(
 	function (_v0, url, key) {
-		var _v1 = $author$project$Main$parseFromTo(url);
-		var f = _v1.a;
-		var t = _v1.b;
+		var _v1 = $author$project$Main$parseState(url);
+		var leftL = _v1.a;
+		var rightL = _v1.b;
+		var li = _v1.c;
+		var curFrom = A2(
+			$elm$core$Maybe$withDefault,
+			$author$project$Main$Apple,
+			A2($elm_community$list_extra$List$Extra$getAt, li, leftL));
+		var curTo = A2(
+			$elm$core$Maybe$withDefault,
+			$author$project$Main$Spotify,
+			$elm$core$List$head(rightL));
 		return _Utils_Tuple2(
 			{
 				body: $author$project$Main$Home,
-				currentFromIndex: 1,
-				currentFromType: f,
-				currentToType: t,
-				from: $author$project$Main$serviceFromType(f),
-				fromOptions: _List_fromArray(
-					[$author$project$Main$Youtube, $author$project$Main$Apple, $author$project$Main$Amazon]),
+				currentFromType: curFrom,
+				currentToType: curTo,
+				from: $author$project$Main$serviceFromType(curFrom),
 				key: key,
+				leftIndex: li,
+				leftList: leftL,
 				loginStatuses: $elm$core$Dict$empty,
+				rightList: rightL,
 				spotifyRaw: $elm$core$Maybe$Nothing,
-				to: $author$project$Main$serviceFromType(t)
+				to: $author$project$Main$serviceFromType(curTo)
 			},
 			$author$project$Main$fetchLoginStatus);
 	});
 var $elm$core$Platform$Sub$batch = _Platform_batch;
 var $elm$core$Platform$Sub$none = $elm$core$Platform$Sub$batch(_List_Nil);
+var $author$project$Main$Done = {$: 'Done'};
 var $author$project$Main$FetchSpotifyPlaylists = {$: 'FetchSpotifyPlaylists'};
 var $author$project$Main$GotSpotifyPlaylists = function (a) {
 	return {$: 'GotSpotifyPlaylists', a: a};
 };
 var $author$project$Main$List = {$: 'List'};
+var $author$project$Main$serviceKey = function (s) {
+	switch (s.$) {
+		case 'Apple':
+			return 'apple';
+		case 'Spotify':
+			return 'spotify';
+		case 'Youtube':
+			return 'youtube';
+		default:
+			return 'amazon';
+	}
+};
+var $author$project$Main$encodeList = A2(
+	$elm$core$Basics$composeR,
+	$elm$core$List$map($author$project$Main$serviceKey),
+	$elm$core$String$join(','));
+var $author$project$Main$encodeUrlFromModel = function (m) {
+	return '/?left=' + ($author$project$Main$encodeList(m.leftList) + ('&right=' + ($author$project$Main$encodeList(m.rightList) + ('&li=' + $elm$core$String$fromInt(m.leftIndex)))));
+};
 var $elm$http$Http$expectString = function (toMsg) {
 	return A2(
 		$elm$http$Http$expectStringResponse,
@@ -6530,42 +6615,11 @@ var $elm$http$Http$expectWhatever = function (toMsg) {
 				return $elm$core$Result$Ok(_Utils_Tuple0);
 			}));
 };
-var $elm$core$List$drop = F2(
-	function (n, list) {
-		drop:
-		while (true) {
-			if (n <= 0) {
-				return list;
-			} else {
-				if (!list.b) {
-					return list;
-				} else {
-					var x = list.a;
-					var xs = list.b;
-					var $temp$n = n - 1,
-						$temp$list = xs;
-					n = $temp$n;
-					list = $temp$list;
-					continue drop;
-				}
-			}
-		}
-	});
-var $elm$core$List$head = function (list) {
-	if (list.b) {
-		var x = list.a;
-		var xs = list.b;
-		return $elm$core$Maybe$Just(x);
-	} else {
-		return $elm$core$Maybe$Nothing;
-	}
-};
-var $elm_community$list_extra$List$Extra$getAt = F2(
-	function (idx, xs) {
-		return (idx < 0) ? $elm$core$Maybe$Nothing : $elm$core$List$head(
-			A2($elm$core$List$drop, idx, xs));
-	});
 var $elm$browser$Browser$Navigation$load = _Browser_load;
+var $elm$core$Basics$min = F2(
+	function (x, y) {
+		return (_Utils_cmp(x, y) < 0) ? x : y;
+	});
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
 var $elm$url$Url$percentEncode = _Url_percentEncode;
@@ -6574,18 +6628,6 @@ var $elm$http$Http$post = function (r) {
 		{body: r.body, expect: r.expect, headers: _List_Nil, method: 'POST', timeout: $elm$core$Maybe$Nothing, tracker: $elm$core$Maybe$Nothing, url: r.url});
 };
 var $elm$browser$Browser$Navigation$pushUrl = _Browser_pushUrl;
-var $author$project$Main$serviceKey = function (s) {
-	switch (s.$) {
-		case 'Apple':
-			return 'apple';
-		case 'Spotify':
-			return 'spotify';
-		case 'Youtube':
-			return 'youtube';
-		default:
-			return 'amazon';
-	}
-};
 var $elm$core$Basics$always = F2(
 	function (a, _v0) {
 		return a;
@@ -6777,18 +6819,31 @@ var $author$project$Main$update = F2(
 				}
 			case 'UrlChanged':
 				var url = msg.a;
-				var _v3 = $author$project$Main$parseFromTo(url);
-				var f = _v3.a;
-				var t = _v3.b;
-				var newModel = _Utils_update(
-					model,
-					{
-						currentFromType: f,
-						currentToType: t,
-						from: $author$project$Main$serviceFromType(f),
-						to: $author$project$Main$serviceFromType(t)
-					});
-				return _Utils_Tuple2(newModel, $author$project$Main$fetchLoginStatus);
+				var _v3 = $author$project$Main$parseState(url);
+				var leftL = _v3.a;
+				var rightL = _v3.b;
+				var li = _v3.c;
+				var curFrom = A2(
+					$elm$core$Maybe$withDefault,
+					$author$project$Main$Apple,
+					A2($elm_community$list_extra$List$Extra$getAt, li, leftL));
+				var curTo = A2(
+					$elm$core$Maybe$withDefault,
+					$author$project$Main$Spotify,
+					$elm$core$List$head(rightL));
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{
+							currentFromType: curFrom,
+							currentToType: curTo,
+							from: $author$project$Main$serviceFromType(curFrom),
+							leftIndex: li,
+							leftList: leftL,
+							rightList: rightL,
+							to: $author$project$Main$serviceFromType(curTo)
+						}),
+					$author$project$Main$fetchLoginStatus);
 			case 'FetchSpotifyPlaylists':
 				return _Utils_Tuple2(
 					model,
@@ -6817,55 +6872,79 @@ var $author$project$Main$update = F2(
 						$elm$core$Platform$Cmd$none);
 				}
 			case 'NextService':
-				var nextIndex = model.currentFromIndex + 1;
-				var lastIndex = $elm$core$List$length(model.fromOptions) - 1;
-				if (_Utils_cmp(nextIndex, lastIndex) > 0) {
-					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-				} else {
-					var newType = A2(
-						$elm$core$Maybe$withDefault,
-						model.currentFromType,
-						A2($elm_community$list_extra$List$Extra$getAt, nextIndex, model.fromOptions));
-					var newService = $author$project$Main$serviceFromType(newType);
-					return _Utils_Tuple2(
-						_Utils_update(
-							model,
-							{currentFromIndex: nextIndex, currentFromType: newType, from: newService}),
-						$elm$core$Platform$Cmd$none);
-				}
-			case 'PrevService':
-				var prevIndex = model.currentFromIndex - 1;
-				if (prevIndex < 0) {
-					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-				} else {
-					var newType = A2(
-						$elm$core$Maybe$withDefault,
-						model.currentFromType,
-						A2($elm_community$list_extra$List$Extra$getAt, prevIndex, model.fromOptions));
-					var newService = $author$project$Main$serviceFromType(newType);
-					return _Utils_Tuple2(
-						_Utils_update(
-							model,
-							{currentFromIndex: prevIndex, currentFromType: newType, from: newService}),
-						$elm$core$Platform$Cmd$none);
-				}
-			case 'Swap':
-				var swappedList = A3($elm_community$list_extra$List$Extra$setAt, model.currentFromIndex, model.currentToType, model.fromOptions);
-				var newModel = _Utils_update(
-					model,
-					{currentFromType: model.currentToType, currentToType: model.currentFromType, from: model.to, fromOptions: swappedList, to: model.from});
-				var newUrl = '/?from=' + ($author$project$Main$serviceKey(newModel.currentFromType) + ('&to=' + $author$project$Main$serviceKey(newModel.currentToType)));
+				var next = A2(
+					$elm$core$Basics$min,
+					model.leftIndex + 1,
+					$elm$core$List$length(model.leftList) - 1);
+				var newFromType = A2(
+					$elm$core$Maybe$withDefault,
+					model.currentFromType,
+					A2($elm_community$list_extra$List$Extra$getAt, next, model.leftList));
 				return _Utils_Tuple2(
-					newModel,
-					A2($elm$browser$Browser$Navigation$pushUrl, model.key, newUrl));
+					_Utils_update(
+						model,
+						{
+							currentFromType: newFromType,
+							from: $author$project$Main$serviceFromType(newFromType),
+							leftIndex: next
+						}),
+					$elm$core$Platform$Cmd$none);
+			case 'PrevService':
+				var prev = A2($elm$core$Basics$max, 0, model.leftIndex - 1);
+				var newFromType = A2(
+					$elm$core$Maybe$withDefault,
+					model.currentFromType,
+					A2($elm_community$list_extra$List$Extra$getAt, prev, model.leftList));
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{
+							currentFromType: newFromType,
+							from: $author$project$Main$serviceFromType(newFromType),
+							leftIndex: prev
+						}),
+					$elm$core$Platform$Cmd$none);
+			case 'Swap':
+				var _v4 = _Utils_Tuple2(
+					A2($elm_community$list_extra$List$Extra$getAt, model.leftIndex, model.leftList),
+					$elm$core$List$head(model.rightList));
+				if ((_v4.a.$ === 'Just') && (_v4.b.$ === 'Just')) {
+					var leftSel = _v4.a.a;
+					var rightHead = _v4.b.a;
+					var newToType = leftSel;
+					var newRight = A2(
+						$elm$core$List$cons,
+						leftSel,
+						A2($elm$core$List$drop, 1, model.rightList));
+					var newLeft = A3($elm_community$list_extra$List$Extra$setAt, model.leftIndex, rightHead, model.leftList);
+					var newFromType = rightHead;
+					var newModel = _Utils_update(
+						model,
+						{
+							currentFromType: newFromType,
+							currentToType: newToType,
+							from: $author$project$Main$serviceFromType(newFromType),
+							leftList: newLeft,
+							rightList: newRight,
+							to: $author$project$Main$serviceFromType(newToType)
+						});
+					return _Utils_Tuple2(
+						newModel,
+						A2(
+							$elm$browser$Browser$Navigation$pushUrl,
+							model.key,
+							$author$project$Main$encodeUrlFromModel(newModel)));
+				} else {
+					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+				}
 			case 'SendLogin':
 				var serviceType = msg.a;
-				var stateStr = 'from=' + ($author$project$Main$serviceKey(model.currentFromType) + ('&to=' + $author$project$Main$serviceKey(model.currentToType)));
+				var stateStr = 'left=' + ($author$project$Main$encodeList(model.leftList) + ('&right=' + ($author$project$Main$encodeList(model.rightList) + ('&li=' + $elm$core$String$fromInt(model.leftIndex)))));
 				var encodedState = $elm$url$Url$percentEncode(stateStr);
 				var url = function () {
 					switch (serviceType.$) {
 						case 'Apple':
-							return 'https://appleid.apple.com/auth/authorize' + ('?client_id=com.hasumi.replaylist.login' + ('&redirect_uri=https://replaylist.ngrok.io/api/login/apple/callback' + ('&response_type=code' + ('&response_mode=form_post' + ('&scope=name+email' + ('&state=' + stateStr))))));
+							return 'https://appleid.apple.com/auth/authorize' + ('?client_id=com.hasumi.replaylist.login' + ('&redirect_uri=https://replaylist.ngrok.io/api/login/apple/callback' + ('&response_type=code' + ('&response_mode=form_post' + ('&scope=name+email' + ('&state=' + encodedState))))));
 						case 'Spotify':
 							return 'https://accounts.spotify.com/authorize' + ('?client_id=a0e8851f25054913bffdfec463b47679' + ('&response_type=code' + ('&redirect_uri=https://replaylist.ngrok.io/api/login/spotify/callback' + ('&scope=playlist-read-private+playlist-modify-private' + ('&state=' + encodedState)))));
 						default:
@@ -6884,7 +6963,7 @@ var $author$project$Main$update = F2(
 			case 'GoList':
 				var cmd = _Utils_eq(model.currentFromType, $author$project$Main$Spotify) ? A2(
 					$elm$core$Task$perform,
-					function (_v5) {
+					function (_v6) {
 						return $author$project$Main$FetchSpotifyPlaylists;
 					},
 					$elm$core$Task$succeed(_Utils_Tuple0)) : $elm$core$Platform$Cmd$none;
@@ -6897,7 +6976,7 @@ var $author$project$Main$update = F2(
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
-						{body: $author$project$Main$List}),
+						{body: $author$project$Main$Done}),
 					$elm$core$Platform$Cmd$none);
 			default:
 				return _Utils_Tuple2(
@@ -6908,7 +6987,7 @@ var $author$project$Main$update = F2(
 						{
 							body: $elm$http$Http$emptyBody,
 							expect: $elm$http$Http$expectWhatever(
-								function (_v6) {
+								function (_v7) {
 									return $author$project$Main$GotLoginStatus(
 										$elm$core$Result$Ok($elm$core$Dict$empty));
 								}),
@@ -7150,7 +7229,7 @@ var $author$project$Main$bodyView = function (model) {
 							]),
 						_List_fromArray(
 							[
-								A4($author$project$Main$leftCard, model.from, model.currentFromType, model.currentFromIndex, model.fromOptions),
+								A4($author$project$Main$leftCard, model.from, model.currentFromType, model.leftIndex, model.leftList),
 								A2(
 								$elm$html$Html$div,
 								_List_fromArray(
@@ -7336,7 +7415,6 @@ var $author$project$Main$footerView = function (model) {
 						]))
 				]) : _List_Nil));
 };
-var $author$project$Main$Done = {$: 'Done'};
 var $author$project$Main$GoDone = {$: 'GoDone'};
 var $author$project$Main$navLink = F3(
 	function (label, msg, active) {

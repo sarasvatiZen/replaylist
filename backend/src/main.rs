@@ -1,5 +1,6 @@
 use actix_files::Files;
 use actix_session::{Session, SessionMiddleware, storage::CookieSessionStore};
+use actix_web::cookie::SameSite;
 use actix_web::{App, HttpResponse, HttpServer, Responder, cookie::Key, get, post, route, web};
 use dotenv::dotenv;
 use reqwest;
@@ -21,20 +22,30 @@ async fn login_callback(
     let service = path.into_inner();
     let _ = session.insert(&service, true);
 
-    let state = q
+    use urlencoding;
+
+    let raw_state = q
         .state
         .clone()
         .or_else(|| form.as_ref().and_then(|f| f.state.clone()))
         .unwrap_or_default();
 
-    let redirect = if state.is_empty() {
+    let decoded = match urlencoding::decode(&raw_state) {
+        Ok(cow) => cow.into_owned(),
+        Err(_) => raw_state.clone(),
+    };
+
+    let mut normalized: &str = decoded.as_str();
+    if let Some(rest) = normalized.strip_prefix("state=") {
+        normalized = rest;
+    }
+    if let Some(rest) = normalized.strip_prefix('?') {
+        normalized = rest;
+    }
+    let redirect = if normalized.is_empty() {
         "/".to_string()
-    } else if state.starts_with("from=") {
-        format!("/?{}", state)
-    } else if state.starts_with("state=") {
-        format!("/?{}", state.trim_start_matches("state="))
     } else {
-        format!("/?state={}", state)
+        format!("/?{}", normalized)
     };
 
     HttpResponse::Found()
@@ -101,7 +112,10 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), secret_key.clone())
-                    .cookie_secure(false)
+                    .cookie_name("replaylist.sid".into())
+                    .cookie_secure(true)
+                    .cookie_same_site(SameSite::None)
+                    .cookie_http_only(true)
                     .build(),
             )
             .service(login_callback)

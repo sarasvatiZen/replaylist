@@ -35,12 +35,13 @@ type alias Model =
     { key : Browser.Navigation.Key
     , body : Body
     , loginStatuses : Dict String Bool
-    , from : Service
-    , to : Service
+    , leftList : List ServiceType
+    , rightList : List ServiceType
+    , leftIndex : Int
     , currentFromType : ServiceType
     , currentToType : ServiceType
-    , fromOptions : List ServiceType
-    , currentFromIndex : Int
+    , from : Service
+    , to : Service
     , spotifyRaw : Maybe String
     }
 
@@ -70,18 +71,25 @@ type Msg
 init : () -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
     let
-        ( f, t ) =
-            parseFromTo url
+        ( leftL, rightL, li ) =
+            parseState url
+
+        curFrom =
+            List.Extra.getAt li leftL |> Maybe.withDefault Apple
+
+        curTo =
+            List.head rightL |> Maybe.withDefault Spotify
     in
     ( { key = key
       , body = Home
       , loginStatuses = Dict.empty
-      , from = serviceFromType f
-      , to = serviceFromType t
-      , currentFromType = f
-      , currentToType = t
-      , fromOptions = [ Youtube, Apple, Amazon ]
-      , currentFromIndex = 1
+      , leftList = leftL
+      , rightList = rightL
+      , leftIndex = li
+      , currentFromType = curFrom
+      , currentToType = curTo
+      , from = serviceFromType curFrom
+      , to = serviceFromType curTo
       , spotifyRaw = Nothing
       }
     , fetchLoginStatus
@@ -152,6 +160,45 @@ serviceKey s =
             "amazon"
 
 
+serviceFromKey : String -> Maybe ServiceType
+serviceFromKey k =
+    case k of
+        "apple" ->
+            Just Apple
+
+        "spotify" ->
+            Just Spotify
+
+        "youtube" ->
+            Just Youtube
+
+        "amazon" ->
+            Just Amazon
+
+        _ ->
+            Nothing
+
+
+encodeList : List ServiceType -> String
+encodeList =
+    List.map serviceKey >> String.join ","
+
+
+decodeList : String -> List ServiceType
+decodeList s =
+    s |> String.split "," |> List.filterMap serviceFromKey
+
+
+encodeUrlFromModel : Model -> String
+encodeUrlFromModel m =
+    "/?left="
+        ++ encodeList m.leftList
+        ++ "&right="
+        ++ encodeList m.rightList
+        ++ "&li="
+        ++ String.fromInt m.leftIndex
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -171,18 +218,26 @@ update msg model =
 
         UrlChanged url ->
             let
-                ( f, t ) =
-                    parseFromTo url
+                ( leftL, rightL, li ) =
+                    parseState url
 
-                newModel =
-                    { model
-                        | currentFromType = f
-                        , currentToType = t
-                        , from = serviceFromType f
-                        , to = serviceFromType t
-                    }
+                curFrom =
+                    List.Extra.getAt li leftL |> Maybe.withDefault Apple
+
+                curTo =
+                    List.head rightL |> Maybe.withDefault Spotify
             in
-            ( newModel, fetchLoginStatus )
+            ( { model
+                | from = serviceFromType curFrom
+                , to = serviceFromType curTo
+                , currentFromType = curFrom
+                , currentToType = curTo
+                , leftList = leftL
+                , rightList = rightL
+                , leftIndex = li
+              }
+            , fetchLoginStatus
+            )
 
         FetchSpotifyPlaylists ->
             ( model
@@ -200,83 +255,81 @@ update msg model =
 
         NextService ->
             let
-                nextIndex =
-                    model.currentFromIndex + 1
+                next =
+                    min (model.leftIndex + 1) (List.length model.leftList - 1)
 
-                lastIndex =
-                    List.length model.fromOptions - 1
+                newFromType =
+                    List.Extra.getAt next model.leftList |> Maybe.withDefault model.currentFromType
             in
-            if nextIndex > lastIndex then
-                ( model, Cmd.none )
-
-            else
-                let
-                    newType =
-                        List.Extra.getAt nextIndex model.fromOptions
-                            |> Maybe.withDefault model.currentFromType
-
-                    newService =
-                        serviceFromType newType
-                in
-                ( { model
-                    | currentFromIndex = nextIndex
-                    , currentFromType = newType
-                    , from = newService
-                  }
-                , Cmd.none
-                )
+            ( { model
+                | leftIndex = next
+                , currentFromType = newFromType
+                , from = serviceFromType newFromType
+              }
+            , Cmd.none
+            )
 
         PrevService ->
             let
-                prevIndex =
-                    model.currentFromIndex - 1
+                prev =
+                    max 0 (model.leftIndex - 1)
+
+                newFromType =
+                    List.Extra.getAt prev model.leftList |> Maybe.withDefault model.currentFromType
             in
-            if prevIndex < 0 then
-                ( model, Cmd.none )
-
-            else
-                let
-                    newType =
-                        List.Extra.getAt prevIndex model.fromOptions
-                            |> Maybe.withDefault model.currentFromType
-
-                    newService =
-                        serviceFromType newType
-                in
-                ( { model
-                    | currentFromIndex = prevIndex
-                    , currentFromType = newType
-                    , from = newService
-                  }
-                , Cmd.none
-                )
+            ( { model
+                | leftIndex = prev
+                , currentFromType = newFromType
+                , from = serviceFromType newFromType
+              }
+            , Cmd.none
+            )
 
         Swap ->
-            let
-                swappedList =
-                    List.Extra.setAt model.currentFromIndex model.currentToType model.fromOptions
+            case
+                ( List.Extra.getAt model.leftIndex model.leftList
+                , List.head model.rightList
+                )
+            of
+                ( Just leftSel, Just rightHead ) ->
+                    let
+                        newLeft =
+                            List.Extra.setAt model.leftIndex rightHead model.leftList
 
-                newModel =
-                    { model
-                        | from = model.to
-                        , to = model.from
-                        , fromOptions = swappedList
-                        , currentFromType = model.currentToType
-                        , currentToType = model.currentFromType
-                    }
+                        newRight =
+                            leftSel :: List.drop 1 model.rightList
 
-                newUrl =
-                    "/?from="
-                        ++ serviceKey newModel.currentFromType
-                        ++ "&to="
-                        ++ serviceKey newModel.currentToType
-            in
-            ( newModel, Browser.Navigation.pushUrl model.key newUrl )
+                        -- 右は基本1件なら [leftSel]
+                        newFromType =
+                            rightHead
+
+                        newToType =
+                            leftSel
+
+                        newModel =
+                            { model
+                                | leftList = newLeft
+                                , rightList = newRight
+                                , currentFromType = newFromType
+                                , currentToType = newToType
+                                , from = serviceFromType newFromType
+                                , to = serviceFromType newToType
+                            }
+                    in
+                    ( newModel, Browser.Navigation.pushUrl model.key (encodeUrlFromModel newModel) )
+
+                _ ->
+                    ( model, Cmd.none )
 
         SendLogin serviceType ->
             let
                 stateStr =
-                    "from=" ++ serviceKey model.currentFromType ++ "&to=" ++ serviceKey model.currentToType
+                    "left="
+                        ++ encodeList model.leftList
+                        ++ "&right="
+                        ++ encodeList model.rightList
+                        ++ "&li="
+                        ++ String.fromInt model.leftIndex
 
                 encodedState =
                     Url.percentEncode stateStr
@@ -288,11 +341,10 @@ update msg model =
                                 ++ "?client_id=com.hasumi.replaylist.login"
                                 ++ "&redirect_uri=https://replaylist.ngrok.io/api/login/apple/callback"
                                 ++ "&response_type=code"
-                                --※ Apple 側は response_mode=query にしておくとサーバでフォーム解析が不要になって楽。
                                 ++ "&response_mode=form_post"
                                 ++ "&scope=name+email"
                                 ++ "&state="
-                                ++ stateStr
+                                ++ encodedState
 
                         Spotify ->
                             "https://accounts.spotify.com/authorize"
@@ -323,7 +375,7 @@ update msg model =
             ( { model | body = List }, cmd )
 
         GoDone ->
-            ( { model | body = List }, Cmd.none )
+            ( { model | body = Done }, Cmd.none )
 
         LogoutAll ->
             ( { model | loginStatuses = Dict.empty }
@@ -412,6 +464,30 @@ parseFromTo url =
     )
 
 
+parseState : Url -> ( List ServiceType, List ServiceType, Int )
+parseState url =
+    let
+        leftS =
+            Parser.parse (Parser.top <?> Query.string "left") url |> Maybe.withDefault Nothing
+
+        rightS =
+            Parser.parse (Parser.top <?> Query.string "right") url |> Maybe.withDefault Nothing
+
+        liS =
+            Parser.parse (Parser.top <?> Query.string "li") url |> Maybe.withDefault Nothing
+
+        leftL =
+            leftS |> Maybe.map decodeList |> Maybe.withDefault [ Youtube, Apple, Amazon ]
+
+        rightL =
+            rightS |> Maybe.map decodeList |> Maybe.withDefault [ Spotify ]
+
+        li =
+            liS |> Maybe.andThen String.toInt |> Maybe.withDefault 1
+    in
+    ( leftL, rightL, li )
+
+
 view : Model -> Browser.Document Msg
 view model =
     { title = "RE:PLAYLIST"
@@ -456,7 +532,7 @@ bodyView model =
         Home ->
             div [ class "body" ]
                 [ div [ class "card-container" ]
-                    [ leftCard model.from model.currentFromType model.currentFromIndex model.fromOptions
+                    [ leftCard model.from model.currentFromType model.leftIndex model.leftList
                     , div [ class "swap-container" ]
                         [ button [ class "swap-btn", onClick Swap ] [ text "⇄" ] ]
                     , rightCard model.to model.currentToType
