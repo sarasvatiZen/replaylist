@@ -2,6 +2,9 @@
 .env
 *.env
 keys/
+*.p8
+*.pem
+private_key*
 
 # ===== Rust (Backend) =====
 /backend/target/

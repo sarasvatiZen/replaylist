@@ -6551,6 +6551,8 @@ var $author$project$Main$init = F3(
 			$elm$core$List$head(rightL));
 		return _Utils_Tuple2(
 			{
+				appleRaw: $elm$core$Maybe$Nothing,
+				appleUserToken: $elm$core$Maybe$Nothing,
 				body: $author$project$Main$Home,
 				currentFromType: curFrom,
 				currentToType: curTo,
@@ -6565,14 +6567,28 @@ var $author$project$Main$init = F3(
 			},
 			$author$project$Main$fetchLoginStatus);
 	});
-var $elm$core$Platform$Sub$batch = _Platform_batch;
-var $elm$core$Platform$Sub$none = $elm$core$Platform$Sub$batch(_List_Nil);
+var $author$project$Main$GotAppleUserToken = function (a) {
+	return {$: 'GotAppleUserToken', a: a};
+};
+var $elm$json$Json$Decode$string = _Json_decodeString;
+var $author$project$Main$receiveAppleUserToken = _Platform_incomingPort('receiveAppleUserToken', $elm$json$Json$Decode$string);
+var $author$project$Main$subscriptions = function (model) {
+	return $author$project$Main$receiveAppleUserToken($author$project$Main$GotAppleUserToken);
+};
 var $author$project$Main$Done = {$: 'Done'};
+var $author$project$Main$FetchApplePlaylists = {$: 'FetchApplePlaylists'};
 var $author$project$Main$FetchSpotifyPlaylists = {$: 'FetchSpotifyPlaylists'};
+var $author$project$Main$GotApplePlaylists = function (a) {
+	return {$: 'GotApplePlaylists', a: a};
+};
+var $author$project$Main$GotDevToken = function (a) {
+	return {$: 'GotDevToken', a: a};
+};
 var $author$project$Main$GotSpotifyPlaylists = function (a) {
 	return {$: 'GotSpotifyPlaylists', a: a};
 };
 var $author$project$Main$List = {$: 'List'};
+var $author$project$Main$NoOp = {$: 'NoOp'};
 var $author$project$Main$serviceKey = function (s) {
 	switch (s.$) {
 		case 'Apple':
@@ -6615,6 +6631,13 @@ var $elm$http$Http$expectWhatever = function (toMsg) {
 				return $elm$core$Result$Ok(_Utils_Tuple0);
 			}));
 };
+var $elm$json$Json$Decode$field = _Json_decodeField;
+var $elm$http$Http$jsonBody = function (value) {
+	return A2(
+		_Http_pair,
+		'application/json',
+		A2($elm$json$Json$Encode$encode, 0, value));
+};
 var $elm$browser$Browser$Navigation$load = _Browser_load;
 var $elm$core$Basics$min = F2(
 	function (x, y) {
@@ -6622,12 +6645,27 @@ var $elm$core$Basics$min = F2(
 	});
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
+var $elm$json$Json$Encode$object = function (pairs) {
+	return _Json_wrap(
+		A3(
+			$elm$core$List$foldl,
+			F2(
+				function (_v0, obj) {
+					var k = _v0.a;
+					var v = _v0.b;
+					return A3(_Json_addField, k, v, obj);
+				}),
+			_Json_emptyObject(_Utils_Tuple0),
+			pairs));
+};
 var $elm$url$Url$percentEncode = _Url_percentEncode;
 var $elm$http$Http$post = function (r) {
 	return $elm$http$Http$request(
 		{body: r.body, expect: r.expect, headers: _List_Nil, method: 'POST', timeout: $elm$core$Maybe$Nothing, tracker: $elm$core$Maybe$Nothing, url: r.url});
 };
 var $elm$browser$Browser$Navigation$pushUrl = _Browser_pushUrl;
+var $elm$json$Json$Encode$string = _Json_wrap;
+var $author$project$Main$requestAppleUserToken = _Platform_outgoingPort('requestAppleUserToken', $elm$json$Json$Encode$string);
 var $elm$core$Basics$always = F2(
 	function (a, _v0) {
 		return a;
@@ -6788,6 +6826,51 @@ var $elm_community$list_extra$List$Extra$setAt = F2(
 var $author$project$Main$update = F2(
 	function (msg, model) {
 		switch (msg.$) {
+			case 'RequestAppleUserToken':
+				return _Utils_Tuple2(
+					model,
+					$elm$http$Http$get(
+						{
+							expect: A2(
+								$elm$http$Http$expectJson,
+								$author$project$Main$GotDevToken,
+								A2($elm$json$Json$Decode$field, 'token', $elm$json$Json$Decode$string)),
+							url: '/api/apple/devtoken'
+						}));
+			case 'GotDevToken':
+				var result = msg.a;
+				if (result.$ === 'Ok') {
+					var devToken = result.a;
+					return _Utils_Tuple2(
+						model,
+						$author$project$Main$requestAppleUserToken(devToken));
+				} else {
+					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+				}
+			case 'GotAppleUserToken':
+				var token = msg.a;
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{
+							appleUserToken: $elm$core$Maybe$Just(token)
+						}),
+					$elm$http$Http$post(
+						{
+							body: $elm$http$Http$jsonBody(
+								$elm$json$Json$Encode$object(
+									_List_fromArray(
+										[
+											_Utils_Tuple2(
+											'token',
+											$elm$json$Json$Encode$string(token))
+										]))),
+							expect: $elm$http$Http$expectWhatever(
+								function (_v2) {
+									return $author$project$Main$NoOp;
+								}),
+							url: '/api/apple/usertoken'
+						}));
 			case 'GotLoginStatus':
 				if (msg.a.$ === 'Ok') {
 					var dict = msg.a.a;
@@ -6807,7 +6890,7 @@ var $author$project$Main$update = F2(
 						model,
 						A2(
 							$elm$core$Task$perform,
-							function (_v2) {
+							function (_v4) {
 								return $author$project$Main$UrlChanged(url);
 							},
 							$elm$core$Task$succeed(_Utils_Tuple0)));
@@ -6819,10 +6902,10 @@ var $author$project$Main$update = F2(
 				}
 			case 'UrlChanged':
 				var url = msg.a;
-				var _v3 = $author$project$Main$parseState(url);
-				var leftL = _v3.a;
-				var rightL = _v3.b;
-				var li = _v3.c;
+				var _v5 = $author$project$Main$parseState(url);
+				var leftL = _v5.a;
+				var rightL = _v5.b;
+				var li = _v5.c;
 				var curFrom = A2(
 					$elm$core$Maybe$withDefault,
 					$author$project$Main$Apple,
@@ -6852,6 +6935,14 @@ var $author$project$Main$update = F2(
 							expect: $elm$http$Http$expectString($author$project$Main$GotSpotifyPlaylists),
 							url: '/api/spotify/playlists/raw'
 						}));
+			case 'FetchApplePlaylists':
+				return _Utils_Tuple2(
+					model,
+					$elm$http$Http$get(
+						{
+							expect: $elm$http$Http$expectString($author$project$Main$GotApplePlaylists),
+							url: '/api/apple/playlists/raw'
+						}));
 			case 'GotSpotifyPlaylists':
 				if (msg.a.$ === 'Ok') {
 					var raw = msg.a.a;
@@ -6868,6 +6959,25 @@ var $author$project$Main$update = F2(
 							model,
 							{
 								spotifyRaw: $elm$core$Maybe$Just('{\"error\":\"failsed to fetch\"}')
+							}),
+						$elm$core$Platform$Cmd$none);
+				}
+			case 'GotApplePlaylists':
+				if (msg.a.$ === 'Ok') {
+					var raw = msg.a.a;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								appleRaw: $elm$core$Maybe$Just(raw)
+							}),
+						$elm$core$Platform$Cmd$none);
+				} else {
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								appleRaw: $elm$core$Maybe$Just('{\"error\":\"failsed to fetch\"}')
 							}),
 						$elm$core$Platform$Cmd$none);
 				}
@@ -6905,12 +7015,12 @@ var $author$project$Main$update = F2(
 						}),
 					$elm$core$Platform$Cmd$none);
 			case 'Swap':
-				var _v4 = _Utils_Tuple2(
+				var _v6 = _Utils_Tuple2(
 					A2($elm_community$list_extra$List$Extra$getAt, model.leftIndex, model.leftList),
 					$elm$core$List$head(model.rightList));
-				if ((_v4.a.$ === 'Just') && (_v4.b.$ === 'Just')) {
-					var leftSel = _v4.a.a;
-					var rightHead = _v4.b.a;
+				if ((_v6.a.$ === 'Just') && (_v6.b.$ === 'Just')) {
+					var leftSel = _v6.a.a;
+					var rightHead = _v6.b.a;
 					var newToType = leftSel;
 					var newRight = A2(
 						$elm$core$List$cons,
@@ -6963,10 +7073,15 @@ var $author$project$Main$update = F2(
 			case 'GoList':
 				var cmd = _Utils_eq(model.currentFromType, $author$project$Main$Spotify) ? A2(
 					$elm$core$Task$perform,
-					function (_v6) {
+					function (_v8) {
 						return $author$project$Main$FetchSpotifyPlaylists;
 					},
-					$elm$core$Task$succeed(_Utils_Tuple0)) : $elm$core$Platform$Cmd$none;
+					$elm$core$Task$succeed(_Utils_Tuple0)) : (_Utils_eq(model.currentFromType, $author$project$Main$Apple) ? A2(
+					$elm$core$Task$perform,
+					function (_v9) {
+						return $author$project$Main$FetchApplePlaylists;
+					},
+					$elm$core$Task$succeed(_Utils_Tuple0)) : $elm$core$Platform$Cmd$none);
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
@@ -6978,7 +7093,7 @@ var $author$project$Main$update = F2(
 						model,
 						{body: $author$project$Main$Done}),
 					$elm$core$Platform$Cmd$none);
-			default:
+			case 'LogoutAll':
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
@@ -6987,18 +7102,19 @@ var $author$project$Main$update = F2(
 						{
 							body: $elm$http$Http$emptyBody,
 							expect: $elm$http$Http$expectWhatever(
-								function (_v7) {
+								function (_v10) {
 									return $author$project$Main$GotLoginStatus(
 										$elm$core$Result$Ok($elm$core$Dict$empty));
 								}),
 							url: '/api/logout_all'
 						}));
+			default:
+				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 		}
 	});
 var $author$project$Main$GoHome = {$: 'GoHome'};
 var $author$project$Main$Swap = {$: 'Swap'};
 var $elm$html$Html$button = _VirtualDom_node('button');
-var $elm$json$Json$Encode$string = _Json_wrap;
 var $elm$html$Html$Attributes$stringProperty = F2(
 	function (key, string) {
 		return A2(
@@ -7010,6 +7126,7 @@ var $elm$html$Html$Attributes$class = $elm$html$Html$Attributes$stringProperty('
 var $elm$html$Html$div = _VirtualDom_node('div');
 var $author$project$Main$NextService = {$: 'NextService'};
 var $author$project$Main$PrevService = {$: 'PrevService'};
+var $author$project$Main$RequestAppleUserToken = {$: 'RequestAppleUserToken'};
 var $author$project$Main$SendLogin = function (a) {
 	return {$: 'SendLogin', a: a};
 };
@@ -7049,8 +7166,15 @@ var $elm$html$Html$Attributes$src = function (url) {
 };
 var $elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
 var $elm$html$Html$text = $elm$virtual_dom$VirtualDom$text;
-var $author$project$Main$leftCard = F4(
-	function (service, currentFromType, currentFromIndex, fromOptions) {
+var $author$project$Main$leftCard = F5(
+	function (model, service, currentFromType, currentFromIndex, fromOptions) {
+		var isLoggedIn = A2(
+			$elm$core$Maybe$withDefault,
+			false,
+			A2(
+				$elm$core$Dict$get,
+				$author$project$Main$serviceKey(currentFromType),
+				model.loginStatuses));
 		var disablePrev = !currentFromIndex;
 		var disableNext = _Utils_eq(
 			currentFromIndex,
@@ -7138,8 +7262,15 @@ var $author$project$Main$leftCard = F4(
 					_List_fromArray(
 						[
 							$elm$html$Html$Attributes$class('login-btn'),
+							$elm$html$Html$Attributes$disabled(isLoggedIn),
 							$elm$html$Html$Events$onClick(
-							$author$project$Main$SendLogin(currentFromType))
+							function () {
+								if (currentFromType.$ === 'Apple') {
+									return $author$project$Main$RequestAppleUserToken;
+								} else {
+									return $author$project$Main$SendLogin(currentFromType);
+								}
+							}())
 						]),
 					_List_fromArray(
 						[
@@ -7148,8 +7279,15 @@ var $author$project$Main$leftCard = F4(
 				]));
 	});
 var $elm$html$Html$pre = _VirtualDom_node('pre');
-var $author$project$Main$rightCard = F2(
-	function (service, currentToType) {
+var $author$project$Main$rightCard = F3(
+	function (model, service, currentToType) {
+		var isLoggedIn = A2(
+			$elm$core$Maybe$withDefault,
+			false,
+			A2(
+				$elm$core$Dict$get,
+				$author$project$Main$serviceKey(currentToType),
+				model.loginStatuses));
 		return A2(
 			$elm$html$Html$div,
 			_List_fromArray(
@@ -7200,6 +7338,7 @@ var $author$project$Main$rightCard = F2(
 					_List_fromArray(
 						[
 							$elm$html$Html$Attributes$class('login-btn'),
+							$elm$html$Html$Attributes$disabled(isLoggedIn),
 							$elm$html$Html$Events$onClick(
 							$author$project$Main$SendLogin(currentToType))
 						]),
@@ -7229,7 +7368,7 @@ var $author$project$Main$bodyView = function (model) {
 							]),
 						_List_fromArray(
 							[
-								A4($author$project$Main$leftCard, model.from, model.currentFromType, model.leftIndex, model.leftList),
+								A5($author$project$Main$leftCard, model, model.from, model.currentFromType, model.leftIndex, model.leftList),
 								A2(
 								$elm$html$Html$div,
 								_List_fromArray(
@@ -7250,34 +7389,50 @@ var $author$project$Main$bodyView = function (model) {
 												$elm$html$Html$text('⇄')
 											]))
 									])),
-								A2($author$project$Main$rightCard, model.to, model.currentToType)
+								A3($author$project$Main$rightCard, model, model.to, model.currentToType)
 							]))
 					]));
 		case 'List':
 			var _v1 = model.currentFromType;
-			if (_v1.$ === 'Spotify') {
-				var shown = A2($elm$core$Maybe$withDefault, 'loading...', model.spotifyRaw);
-				return A2(
-					$elm$html$Html$div,
-					_List_Nil,
-					_List_fromArray(
-						[
-							A2(
-							$elm$html$Html$pre,
-							_List_Nil,
-							_List_fromArray(
-								[
-									$elm$html$Html$text(shown)
-								]))
-						]));
-			} else {
-				return A2(
-					$elm$html$Html$div,
-					_List_Nil,
-					_List_fromArray(
-						[
-							$elm$html$Html$text('List (non-Spotify) is WIP')
-						]));
+			switch (_v1.$) {
+				case 'Spotify':
+					var shown = A2($elm$core$Maybe$withDefault, 'loading...', model.spotifyRaw);
+					return A2(
+						$elm$html$Html$div,
+						_List_Nil,
+						_List_fromArray(
+							[
+								A2(
+								$elm$html$Html$pre,
+								_List_Nil,
+								_List_fromArray(
+									[
+										$elm$html$Html$text(shown)
+									]))
+							]));
+				case 'Apple':
+					var shown = A2($elm$core$Maybe$withDefault, 'loading...', model.appleRaw);
+					return A2(
+						$elm$html$Html$div,
+						_List_Nil,
+						_List_fromArray(
+							[
+								A2(
+								$elm$html$Html$pre,
+								_List_Nil,
+								_List_fromArray(
+									[
+										$elm$html$Html$text(shown)
+									]))
+							]));
+				default:
+					return A2(
+						$elm$html$Html$div,
+						_List_Nil,
+						_List_fromArray(
+							[
+								$elm$html$Html$text('List (non-Spotify) is WIP')
+							]));
 			}
 		default:
 			return A2(
@@ -7516,15 +7671,6 @@ var $author$project$Main$view = function (model) {
 	};
 };
 var $author$project$Main$main = $elm$browser$Browser$application(
-	{
-		init: $author$project$Main$init,
-		onUrlChange: $author$project$Main$UrlChanged,
-		onUrlRequest: $author$project$Main$UrlRequested,
-		subscriptions: function (_v0) {
-			return $elm$core$Platform$Sub$none;
-		},
-		update: $author$project$Main$update,
-		view: $author$project$Main$view
-	});
+	{init: $author$project$Main$init, onUrlChange: $author$project$Main$UrlChanged, onUrlRequest: $author$project$Main$UrlRequested, subscriptions: $author$project$Main$subscriptions, update: $author$project$Main$update, view: $author$project$Main$view});
 _Platform_export({'Main':{'init':$author$project$Main$main(
 	$elm$json$Json$Decode$succeed(_Utils_Tuple0))(0)}});}(this));

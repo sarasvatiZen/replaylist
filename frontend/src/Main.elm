@@ -1,4 +1,4 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 import Browser
 import Browser.Navigation
@@ -8,6 +8,7 @@ import Html.Attributes exposing (class, src)
 import Html.Events exposing (onClick)
 import Http
 import Json.Decode as D
+import Json.Encode as E
 import List.Extra
 import String
 import Task
@@ -15,6 +16,12 @@ import Url exposing (Url)
 import Url.Builder exposing (string)
 import Url.Parser as Parser exposing ((<?>), Parser)
 import Url.Parser.Query as Query
+
+
+port requestAppleUserToken : String -> Cmd msg
+
+
+port receiveAppleUserToken : (String -> msg) -> Sub msg
 
 
 type ServiceType
@@ -43,6 +50,8 @@ type alias Model =
     , from : Service
     , to : Service
     , spotifyRaw : Maybe String
+    , appleRaw : Maybe String
+    , appleUserToken : Maybe String
     }
 
 
@@ -65,7 +74,13 @@ type Msg
     | SendLogin ServiceType
     | LogoutAll
     | FetchSpotifyPlaylists
+    | FetchApplePlaylists
     | GotSpotifyPlaylists (Result Http.Error String)
+    | GotApplePlaylists (Result Http.Error String)
+    | RequestAppleUserToken
+    | GotAppleUserToken String
+    | GotDevToken (Result Http.Error String)
+    | NoOp
 
 
 init : () -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
@@ -91,6 +106,8 @@ init _ url key =
       , from = serviceFromType curFrom
       , to = serviceFromType curTo
       , spotifyRaw = Nothing
+      , appleRaw = Nothing
+      , appleUserToken = Nothing
       }
     , fetchLoginStatus
     )
@@ -202,6 +219,36 @@ encodeUrlFromModel m =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        RequestAppleUserToken ->
+            ( model
+            , Http.get
+                { url = "/api/apple/devtoken"
+                , expect = Http.expectJson GotDevToken (D.field "token" D.string)
+                }
+            )
+
+        GotDevToken result ->
+            case result of
+                Ok devToken ->
+                    ( model, requestAppleUserToken devToken )
+
+                Err _ ->
+                    ( model, Cmd.none )
+
+        GotAppleUserToken token ->
+            ( { model | appleUserToken = Just token }
+            , Http.post
+                { url = "/api/apple/usertoken"
+                , body =
+                    Http.jsonBody
+                        (E.object
+                            [ ( "token", E.string token )
+                            ]
+                        )
+                , expect = Http.expectWhatever (\_ -> NoOp)
+                }
+            )
+
         GotLoginStatus (Ok dict) ->
             ( { model | loginStatuses = dict }, Cmd.none )
 
@@ -247,11 +294,25 @@ update msg model =
                 }
             )
 
+        FetchApplePlaylists ->
+            ( model
+            , Http.get
+                { url = "/api/apple/playlists/raw"
+                , expect = Http.expectString GotApplePlaylists
+                }
+            )
+
         GotSpotifyPlaylists (Ok raw) ->
             ( { model | spotifyRaw = Just raw }, Cmd.none )
 
         GotSpotifyPlaylists (Err _) ->
             ( { model | spotifyRaw = Just "{\"error\":\"failsed to fetch\"}" }, Cmd.none )
+
+        GotApplePlaylists (Ok raw) ->
+            ( { model | appleRaw = Just raw }, Cmd.none )
+
+        GotApplePlaylists (Err _) ->
+            ( { model | appleRaw = Just "{\"error\":\"failsed to fetch\"}" }, Cmd.none )
 
         NextService ->
             let
@@ -369,6 +430,9 @@ update msg model =
                     if model.currentFromType == Spotify then
                         Task.perform (\_ -> FetchSpotifyPlaylists) (Task.succeed ())
 
+                    else if model.currentFromType == Apple then
+                        Task.perform (\_ -> FetchApplePlaylists) (Task.succeed ())
+
                     else
                         Cmd.none
             in
@@ -385,6 +449,9 @@ update msg model =
                 , expect = Http.expectWhatever (\_ -> GotLoginStatus (Ok Dict.empty))
                 }
             )
+
+        NoOp ->
+            ( model, Cmd.none )
 
 
 serviceFromType : ServiceType -> Service
@@ -532,10 +599,10 @@ bodyView model =
         Home ->
             div [ class "body" ]
                 [ div [ class "card-container" ]
-                    [ leftCard model.from model.currentFromType model.leftIndex model.leftList
+                    [ leftCard model model.from model.currentFromType model.leftIndex model.leftList
                     , div [ class "swap-container" ]
                         [ button [ class "swap-btn", onClick Swap ] [ text "⇄" ] ]
-                    , rightCard model.to model.currentToType
+                    , rightCard model model.to model.currentToType
                     ]
                 ]
 
@@ -548,6 +615,13 @@ bodyView model =
                     in
                     div [] [ Html.pre [] [ text shown ] ]
 
+                Apple ->
+                    let
+                        shown =
+                            model.appleRaw |> Maybe.withDefault "loading..."
+                    in
+                    div [] [ Html.pre [] [ text shown ] ]
+
                 _ ->
                     div [] [ text "List (non-Spotify) is WIP" ]
 
@@ -555,14 +629,18 @@ bodyView model =
             div [] [ text "Hello, Body3", button [ onClick GoHome ] [ text "Back to Body1" ] ]
 
 
-leftCard : Service -> ServiceType -> Int -> List ServiceType -> Html Msg
-leftCard service currentFromType currentFromIndex fromOptions =
+leftCard : Model -> Service -> ServiceType -> Int -> List ServiceType -> Html Msg
+leftCard model service currentFromType currentFromIndex fromOptions =
     let
         disablePrev =
             currentFromIndex == 0
 
         disableNext =
             currentFromIndex == (List.length fromOptions - 1)
+
+        isLoggedIn =
+            Dict.get (serviceKey currentFromType) model.loginStatuses
+                |> Maybe.withDefault False
     in
     div [ class "card card-left" ]
         [ div [ class "card-title" ] [ text "FROM:" ]
@@ -583,18 +661,40 @@ leftCard service currentFromType currentFromIndex fromOptions =
                 ]
                 [ text "▷" ]
             ]
-        , button [ class "login-btn", onClick (SendLogin currentFromType) ] [ text service.loginLabel ]
+        , button
+            [ class "login-btn"
+            , Html.Attributes.disabled isLoggedIn
+            , onClick
+                (case currentFromType of
+                    Apple ->
+                        RequestAppleUserToken
+
+                    _ ->
+                        SendLogin currentFromType
+                )
+            ]
+            [ text service.loginLabel ]
         ]
 
 
-rightCard : Service -> ServiceType -> Html Msg
-rightCard service currentToType =
+rightCard : Model -> Service -> ServiceType -> Html Msg
+rightCard model service currentToType =
+    let
+        isLoggedIn =
+            Dict.get (serviceKey currentToType) model.loginStatuses
+                |> Maybe.withDefault False
+    in
     div [ class "card card-right" ]
         [ div [ class "card-title" ] [ text "TO:" ]
         , div [ class "card-icon" ]
             [ img [ src service.icon, class "music-icon" ] [] ]
         , div [ class "service-name-right" ] [ text service.name ]
-        , button [ class "login-btn", onClick (SendLogin currentToType) ] [ text service.loginLabel ]
+        , button
+            [ class "login-btn"
+            , Html.Attributes.disabled isLoggedIn
+            , onClick (SendLogin currentToType)
+            ]
+            [ text service.loginLabel ]
         ]
 
 
@@ -642,13 +742,17 @@ footerView model =
         )
 
 
+subscriptions model =
+    receiveAppleUserToken GotAppleUserToken
+
+
 main : Program () Model Msg
 main =
     Browser.application
         { init = init
         , update = update
         , view = view
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = subscriptions
         , onUrlChange = UrlChanged
         , onUrlRequest = UrlRequested
         }
