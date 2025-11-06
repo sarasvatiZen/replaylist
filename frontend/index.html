@@ -8,34 +8,32 @@
     <body>
         <div id="app"></div>
 
-        <script src="main.js"></script>
         <script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js"></script>
 
+        <!-- ✅ Elm の JS バンドルを必ず先に読み込む -->
+        <script src="main.js"></script>
+
         <script>
-            var app = Elm.Main.init({
-                node: document.getElementById("app"),
-            });
+            var app = Elm.Main.init({ node: document.getElementById("app") });
 
-            document.addEventListener("musickitloaded", function () {
-                app.ports.requestAppleUserToken.subscribe(
-                    async function (devToken) {
-                        try {
-                            MusicKit.configure({
-                                developerToken: devToken,
-                                app: {
-                                    name: "Replaylist",
-                                    build: "1.0.0",
-                                },
-                            });
+            app.ports.appleLogin.subscribe(async () => {
+                try {
+                    const { token: devToken } = await (
+                        await fetch("/api/apple/devtoken")
+                    ).json();
 
-                            const music = MusicKit.getInstance();
-                            const token = await music.authorize();
-                            app.ports.receiveAppleUserToken.send(token);
-                        } catch (e) {
-                            console.error("Apple Music auth failed", e);
-                        }
-                    },
-                );
+                    MusicKit.configure({
+                        developerToken: devToken,
+                        app: { name: "Replaylist", build: "1.0" },
+                    });
+
+                    const music = MusicKit.getInstance();
+                    const userToken = await music.authorize();
+
+                    app.ports.receiveAppleUserToken.send(userToken);
+                } catch (err) {
+                    console.error("Apple login failed:", err);
+                }
             });
         </script>
     </body>

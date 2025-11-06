@@ -3,13 +3,14 @@ port module Main exposing (main)
 import Browser
 import Browser.Navigation
 import Dict exposing (Dict)
-import Html exposing (Html, button, div, img, span, text)
-import Html.Attributes exposing (class, src)
-import Html.Events exposing (onClick)
+import Html exposing (Html, button, div, img, input, span, text)
+import Html.Attributes exposing (checked, class, src, type_)
+import Html.Events exposing (onCheck, onClick)
 import Http
 import Json.Decode as D
 import Json.Encode as E
 import List.Extra
+import Process
 import String
 import Task
 import Url exposing (Url)
@@ -18,10 +19,20 @@ import Url.Parser as Parser exposing ((<?>), Parser)
 import Url.Parser.Query as Query
 
 
-port requestAppleUserToken : String -> Cmd msg
+port appleLogin : () -> Cmd msg
 
 
 port receiveAppleUserToken : (String -> msg) -> Sub msg
+
+
+type alias PlaylistItem =
+    { id : String
+    , name : String
+    , cover : String
+    , trackCount : Int
+    , checked : Bool
+    , tracks : List String
+    }
 
 
 type ServiceType
@@ -52,6 +63,8 @@ type alias Model =
     , spotifyRaw : Maybe String
     , appleRaw : Maybe String
     , appleUserToken : Maybe String
+    , applePlaylists : List PlaylistItem
+    , spotifyPlaylists : List PlaylistItem
     }
 
 
@@ -77,9 +90,11 @@ type Msg
     | FetchApplePlaylists
     | GotSpotifyPlaylists (Result Http.Error String)
     | GotApplePlaylists (Result Http.Error String)
-    | RequestAppleUserToken
     | GotAppleUserToken String
-    | GotDevToken (Result Http.Error String)
+    | ToggleAll Bool
+    | ToggleOne String Bool
+    | FetchLoginStatusAfterApple
+    | AppleLoginAgain
     | NoOp
 
 
@@ -94,22 +109,29 @@ init _ url key =
 
         curTo =
             List.head rightL |> Maybe.withDefault Spotify
+
+        model =
+            { key = key
+            , body = Home
+            , loginStatuses = Dict.empty
+            , leftList = leftL
+            , rightList = rightL
+            , leftIndex = li
+            , currentFromType = curFrom
+            , currentToType = curTo
+            , from = serviceFromType curFrom
+            , to = serviceFromType curTo
+            , spotifyRaw = Nothing
+            , appleRaw = Nothing
+            , appleUserToken = Nothing
+            , applePlaylists = []
+            , spotifyPlaylists = []
+            }
     in
-    ( { key = key
-      , body = Home
-      , loginStatuses = Dict.empty
-      , leftList = leftL
-      , rightList = rightL
-      , leftIndex = li
-      , currentFromType = curFrom
-      , currentToType = curTo
-      , from = serviceFromType curFrom
-      , to = serviceFromType curTo
-      , spotifyRaw = Nothing
-      , appleRaw = Nothing
-      , appleUserToken = Nothing
-      }
-    , fetchLoginStatus
+    ( model
+    , Cmd.batch
+        [ fetchLoginStatus
+        ]
     )
 
 
@@ -143,6 +165,47 @@ fetchLoginStatus =
         { url = "/api/login/status"
         , expect = Http.expectJson GotLoginStatus loginStatusDecoder
         }
+
+
+decodePlaylistItem : D.Decoder PlaylistItem
+decodePlaylistItem =
+    D.map6 PlaylistItem
+        (D.field "id" D.string)
+        (D.field "name" D.string)
+        (D.field "cover" D.string)
+        (D.field "track_count" D.int)
+        (D.succeed False)
+        (D.field "tracks" (D.list D.string))
+
+
+decodeSpotifyPlaylists : D.Decoder (List PlaylistItem)
+decodeSpotifyPlaylists =
+    D.list decodePlaylistItem
+
+
+decodeApplePlaylists : D.Decoder (List PlaylistItem)
+decodeApplePlaylists =
+    D.list decodePlaylistItem
+
+
+playlistDecoder : D.Decoder (List PlaylistItem)
+playlistDecoder =
+    D.list decodePlaylistItem
+
+
+viewRow : PlaylistItem -> Html Msg
+viewRow p =
+    div [ class "row" ]
+        [ input [ type_ "checkbox", checked p.checked, onCheck (\b -> ToggleOne p.id b) ] []
+        , div [ class "cell meta" ]
+            [ img [ src p.cover, class "cover" ] []
+            , div [ class "title" ] [ text p.name ]
+            ]
+        , div [ class "cell tracks" ]
+            [ div [ class "track-list" ]
+                (List.map (\t -> div [ class "track" ] [ text t ]) p.tracks)
+            ]
+        ]
 
 
 serviceName : ServiceType -> String
@@ -216,25 +279,64 @@ encodeUrlFromModel m =
         ++ String.fromInt m.leftIndex
 
 
+loginCmd : ServiceType -> Model -> Cmd Msg
+loginCmd serviceType model =
+    let
+        stateStr =
+            "left="
+                ++ encodeList model.leftList
+                ++ "&right="
+                ++ encodeList model.rightList
+                ++ "&li="
+                ++ String.fromInt model.leftIndex
+
+        encodedState =
+            Url.percentEncode stateStr
+    in
+    case serviceType of
+        Apple ->
+            appleLogin ()
+
+        Spotify ->
+            Browser.Navigation.load
+                ("https://accounts.spotify.com/authorize"
+                    ++ "?client_id=a0e8851f25054913bffdfec463b47679"
+                    ++ "&response_type=code"
+                    ++ "&redirect_uri=https://replaylist.ngrok.io/api/login/spotify/callback"
+                    ++ "&scope=playlist-read-private+playlist-modify-private"
+                    ++ "&state="
+                    ++ encodedState
+                )
+
+        Youtube ->
+            Cmd.none
+
+        Amazon ->
+            Cmd.none
+
+
+fetchPlaylists : ServiceType -> Cmd Msg
+fetchPlaylists serviceType =
+    case serviceType of
+        Apple ->
+            Http.get
+                { url = "/api/apple/playlists"
+                , expect = Http.expectString GotApplePlaylists
+                }
+
+        Spotify ->
+            Http.get
+                { url = "/api/spotify/playlists"
+                , expect = Http.expectString GotSpotifyPlaylists
+                }
+
+        _ ->
+            Cmd.none
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        RequestAppleUserToken ->
-            ( model
-            , Http.get
-                { url = "/api/apple/devtoken"
-                , expect = Http.expectJson GotDevToken (D.field "token" D.string)
-                }
-            )
-
-        GotDevToken result ->
-            case result of
-                Ok devToken ->
-                    ( model, requestAppleUserToken devToken )
-
-                Err _ ->
-                    ( model, Cmd.none )
-
         GotAppleUserToken token ->
             ( { model | appleUserToken = Just token }
             , Http.post
@@ -242,10 +344,9 @@ update msg model =
                 , body =
                     Http.jsonBody
                         (E.object
-                            [ ( "token", E.string token )
-                            ]
+                            [ ( "token", E.string token ) ]
                         )
-                , expect = Http.expectWhatever (\_ -> NoOp)
+                , expect = Http.expectWhatever (\_ -> FetchLoginStatusAfterApple)
                 }
             )
 
@@ -286,30 +387,40 @@ update msg model =
             , fetchLoginStatus
             )
 
-        FetchSpotifyPlaylists ->
-            ( model
-            , Http.get
-                { url = "/api/spotify/playlists/raw"
-                , expect = Http.expectString GotSpotifyPlaylists
-                }
-            )
-
         FetchApplePlaylists ->
             ( model
             , Http.get
-                { url = "/api/apple/playlists/raw"
+                { url = "/api/apple/playlists"
                 , expect = Http.expectString GotApplePlaylists
                 }
             )
 
+        FetchSpotifyPlaylists ->
+            ( model
+            , Http.get
+                { url = "/api/spotify/playlists"
+                , expect = Http.expectString GotSpotifyPlaylists
+                }
+            )
+
         GotSpotifyPlaylists (Ok raw) ->
-            ( { model | spotifyRaw = Just raw }, Cmd.none )
+            let
+                decoded =
+                    D.decodeString decodeSpotifyPlaylists raw
+                        |> Result.withDefault []
+            in
+            ( { model | spotifyPlaylists = decoded }, Cmd.none )
 
         GotSpotifyPlaylists (Err _) ->
             ( { model | spotifyRaw = Just "{\"error\":\"failsed to fetch\"}" }, Cmd.none )
 
         GotApplePlaylists (Ok raw) ->
-            ( { model | appleRaw = Just raw }, Cmd.none )
+            let
+                decoded =
+                    D.decodeString decodeApplePlaylists raw
+                        |> Result.withDefault []
+            in
+            ( { model | applePlaylists = decoded }, Cmd.none )
 
         GotApplePlaylists (Err _) ->
             ( { model | appleRaw = Just "{\"error\":\"failsed to fetch\"}" }, Cmd.none )
@@ -360,7 +471,6 @@ update msg model =
                         newRight =
                             leftSel :: List.drop 1 model.rightList
 
-                        -- 右は基本1件なら [leftSel]
                         newFromType =
                             rightHead
 
@@ -383,43 +493,20 @@ update msg model =
                     ( model, Cmd.none )
 
         SendLogin serviceType ->
-            let
-                stateStr =
-                    "left="
-                        ++ encodeList model.leftList
-                        ++ "&right="
-                        ++ encodeList model.rightList
-                        ++ "&li="
-                        ++ String.fromInt model.leftIndex
+            case serviceType of
+                Apple ->
+                    ( model
+                    , Cmd.batch
+                        [ appleLogin ()
+                        , Process.sleep 100 |> Task.perform (\_ -> AppleLoginAgain)
+                        ]
+                    )
 
-                encodedState =
-                    Url.percentEncode stateStr
+                Spotify ->
+                    ( model, Browser.Navigation.load "/api/login/spotify" )
 
-                url =
-                    case serviceType of
-                        Apple ->
-                            "https://appleid.apple.com/auth/authorize"
-                                ++ "?client_id=com.hasumi.replaylist.login"
-                                ++ "&redirect_uri=https://replaylist.ngrok.io/api/login/apple/callback"
-                                ++ "&response_type=code"
-                                ++ "&response_mode=form_post"
-                                ++ "&scope=name+email"
-                                ++ "&state="
-                                ++ encodedState
-
-                        Spotify ->
-                            "https://accounts.spotify.com/authorize"
-                                ++ "?client_id=a0e8851f25054913bffdfec463b47679"
-                                ++ "&response_type=code"
-                                ++ "&redirect_uri=https://replaylist.ngrok.io/api/login/spotify/callback"
-                                ++ "&scope=playlist-read-private+playlist-modify-private"
-                                ++ "&state="
-                                ++ encodedState
-
-                        _ ->
-                            ""
-            in
-            ( model, Browser.Navigation.load url )
+                _ ->
+                    ( model, Cmd.none )
 
         GoHome ->
             ( { model | body = Home }, Cmd.none )
@@ -450,6 +537,68 @@ update msg model =
                 }
             )
 
+        ToggleAll state ->
+            case model.currentFromType of
+                Apple ->
+                    ( { model
+                        | applePlaylists = List.map (\p -> { p | checked = state }) model.applePlaylists
+                      }
+                    , Cmd.none
+                    )
+
+                Spotify ->
+                    ( { model
+                        | spotifyPlaylists = List.map (\p -> { p | checked = state }) model.spotifyPlaylists
+                      }
+                    , Cmd.none
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ToggleOne pid state ->
+            case model.currentFromType of
+                Apple ->
+                    ( { model
+                        | applePlaylists =
+                            List.map
+                                (\p ->
+                                    if p.id == pid then
+                                        { p | checked = state }
+
+                                    else
+                                        p
+                                )
+                                model.applePlaylists
+                      }
+                    , Cmd.none
+                    )
+
+                Spotify ->
+                    ( { model
+                        | spotifyPlaylists =
+                            List.map
+                                (\p ->
+                                    if p.id == pid then
+                                        { p | checked = state }
+
+                                    else
+                                        p
+                                )
+                                model.spotifyPlaylists
+                      }
+                    , Cmd.none
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        FetchLoginStatusAfterApple ->
+            ( model, fetchLoginStatus )
+
+        AppleLoginAgain ->
+            ( model, appleLogin () )
+
         NoOp ->
             ( model, Cmd.none )
 
@@ -460,7 +609,7 @@ serviceFromType sType =
         Apple ->
             { name = "AppleMusic"
             , icon = "assets/AppleMusicIcon.png"
-            , loginLabel = "Login with AppleID"
+            , loginLabel = "Login with AppleMusic"
             }
 
         Youtube ->
@@ -607,26 +756,37 @@ bodyView model =
                 ]
 
         List ->
-            case model.currentFromType of
-                Spotify ->
-                    let
-                        shown =
-                            model.spotifyRaw |> Maybe.withDefault "loading..."
-                    in
-                    div [] [ Html.pre [] [ text shown ] ]
+            let
+                currentList =
+                    case model.currentFromType of
+                        Apple ->
+                            model.applePlaylists
 
-                Apple ->
-                    let
-                        shown =
-                            model.appleRaw |> Maybe.withDefault "loading..."
-                    in
-                    div [] [ Html.pre [] [ text shown ] ]
+                        Spotify ->
+                            model.spotifyPlaylists
 
-                _ ->
-                    div [] [ text "List (non-Spotify) is WIP" ]
+                        _ ->
+                            []
+            in
+            viewPlaylistTable currentList
 
         Done ->
             div [] [ text "Hello, Body3", button [ onClick GoHome ] [ text "Back to Body1" ] ]
+
+
+viewPlaylistTable : List PlaylistItem -> Html Msg
+viewPlaylistTable list =
+    div [ class "playlist-table" ]
+        (headerRow :: List.map viewRow list)
+
+
+headerRow : Html Msg
+headerRow =
+    div [ class "row header" ]
+        [ input [ type_ "checkbox", onCheck ToggleAll ] []
+        , div [ class "cell" ] []
+        , div [ class "cell" ] []
+        ]
 
 
 leftCard : Model -> Service -> ServiceType -> Int -> List ServiceType -> Html Msg
@@ -664,14 +824,7 @@ leftCard model service currentFromType currentFromIndex fromOptions =
         , button
             [ class "login-btn"
             , Html.Attributes.disabled isLoggedIn
-            , onClick
-                (case currentFromType of
-                    Apple ->
-                        RequestAppleUserToken
-
-                    _ ->
-                        SendLogin currentFromType
-                )
+            , onClick (SendLogin currentFromType)
             ]
             [ text service.loginLabel ]
         ]
