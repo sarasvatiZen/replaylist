@@ -14,8 +14,7 @@ import Process
 import String
 import Task
 import Url exposing (Url)
-import Url.Builder exposing (string)
-import Url.Parser as Parser exposing ((<?>), Parser)
+import Url.Parser as Parser exposing ((<?>))
 import Url.Parser.Query as Query
 
 
@@ -65,6 +64,7 @@ type alias Model =
     , appleUserToken : Maybe String
     , applePlaylists : List PlaylistItem
     , spotifyPlaylists : List PlaylistItem
+    , isLoading : Bool
     }
 
 
@@ -95,6 +95,7 @@ type Msg
     | ToggleOne String Bool
     | FetchLoginStatusAfterApple
     | AppleLoginAgain
+    | TransferSelected
     | NoOp
 
 
@@ -126,6 +127,7 @@ init _ url key =
             , appleUserToken = Nothing
             , applePlaylists = []
             , spotifyPlaylists = []
+            , isLoading = False
             }
     in
     ( model
@@ -185,11 +187,6 @@ decodeSpotifyPlaylists =
 
 decodeApplePlaylists : D.Decoder (List PlaylistItem)
 decodeApplePlaylists =
-    D.list decodePlaylistItem
-
-
-playlistDecoder : D.Decoder (List PlaylistItem)
-playlistDecoder =
     D.list decodePlaylistItem
 
 
@@ -309,7 +306,19 @@ loginCmd serviceType model =
                 )
 
         Youtube ->
-            Cmd.none
+            Browser.Navigation.load
+                ("https://accounts.google.com/o/oauth2/v2/auth"
+                    ++ "?response_type=code"
+                    ++ "&client_id="
+                    ++ Url.percentEncode "263472270217-7ndt9q7oe9qm0r0dc01jaqu7p712a02h.apps.googleusercontent.com"
+                    ++ "&redirect_uri="
+                    ++ Url.percentEncode "https://replaylist.ngrok.io/api/login/youtube/callback"
+                    ++ "&scope="
+                    ++ Url.percentEncode "https://www.googleapis.com/auth/youtube.readonly"
+                    ++ "&access_type=offline&include_granted_scopes=true&prompt=consent"
+                    ++ "&state="
+                    ++ encodedState
+                )
 
         Amazon ->
             Cmd.none
@@ -388,7 +397,7 @@ update msg model =
             )
 
         FetchApplePlaylists ->
-            ( model
+            ( { model | isLoading = True }
             , Http.get
                 { url = "/api/apple/playlists"
                 , expect = Http.expectString GotApplePlaylists
@@ -396,7 +405,7 @@ update msg model =
             )
 
         FetchSpotifyPlaylists ->
-            ( model
+            ( { model | isLoading = True }
             , Http.get
                 { url = "/api/spotify/playlists"
                 , expect = Http.expectString GotSpotifyPlaylists
@@ -409,10 +418,10 @@ update msg model =
                     D.decodeString decodeSpotifyPlaylists raw
                         |> Result.withDefault []
             in
-            ( { model | spotifyPlaylists = decoded }, Cmd.none )
+            ( { model | spotifyPlaylists = decoded, isLoading = False }, Cmd.none )
 
         GotSpotifyPlaylists (Err _) ->
-            ( { model | spotifyRaw = Just "{\"error\":\"failsed to fetch\"}" }, Cmd.none )
+            ( { model | spotifyRaw = Just "{\"error\":\"failed to fetch\"}", isLoading = False }, Cmd.none )
 
         GotApplePlaylists (Ok raw) ->
             let
@@ -420,10 +429,10 @@ update msg model =
                     D.decodeString decodeApplePlaylists raw
                         |> Result.withDefault []
             in
-            ( { model | applePlaylists = decoded }, Cmd.none )
+            ( { model | applePlaylists = decoded, isLoading = False }, Cmd.none )
 
         GotApplePlaylists (Err _) ->
-            ( { model | appleRaw = Just "{\"error\":\"failsed to fetch\"}" }, Cmd.none )
+            ( { model | appleRaw = Just "{\"error\":\"failed to fetch\"}", isLoading = False }, Cmd.none )
 
         NextService ->
             let
@@ -503,7 +512,10 @@ update msg model =
                     )
 
                 Spotify ->
-                    ( model, Browser.Navigation.load "/api/login/spotify" )
+                    ( model, loginCmd Spotify model )
+
+                Youtube ->
+                    ( model, loginCmd Youtube model )
 
                 _ ->
                     ( model, Cmd.none )
@@ -523,7 +535,7 @@ update msg model =
                     else
                         Cmd.none
             in
-            ( { model | body = List }, cmd )
+            ( { model | body = List, isLoading = True }, cmd )
 
         GoDone ->
             ( { model | body = Done }, Cmd.none )
@@ -598,6 +610,9 @@ update msg model =
 
         AppleLoginAgain ->
             ( model, appleLogin () )
+
+        TransferSelected ->
+            ( model, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
@@ -678,6 +693,19 @@ parseFromTo url =
     ( fromK |> Maybe.withDefault Nothing |> fromType
     , toK |> Maybe.withDefault Nothing |> toType
     )
+
+
+parseBody : Url -> Body
+parseBody url =
+    case url.path of
+        "/list" ->
+            List
+
+        "/done" ->
+            Done
+
+        _ ->
+            Home
 
 
 parseState : Url -> ( List ServiceType, List ServiceType, Int )
@@ -768,25 +796,38 @@ bodyView model =
                         _ ->
                             []
             in
-            viewPlaylistTable currentList
+            viewPlaylistTable model.isLoading currentList
 
         Done ->
             div [] [ text "Hello, Body3", button [ onClick GoHome ] [ text "Back to Body1" ] ]
 
 
-viewPlaylistTable : List PlaylistItem -> Html Msg
-viewPlaylistTable list =
-    div [ class "playlist-table" ]
-        (headerRow :: List.map viewRow list)
-
-
-headerRow : Html Msg
-headerRow =
-    div [ class "row header" ]
+headerRow : Bool -> Html Msg
+headerRow isLoading =
+    div [ class "row playlist-header" ]
         [ input [ type_ "checkbox", onCheck ToggleAll ] []
-        , div [ class "cell" ] []
-        , div [ class "cell" ] []
+        , div [ class "loading-row" ]
+            [ if isLoading then
+                div [ class "loading-bar" ] []
+
+              else
+                button
+                    [ class "transfer-btn", onClick TransferSelected ]
+                    [ text "Send Playlists →" ]
+            ]
         ]
+
+
+loadingIndicatorView : Html Msg
+loadingIndicatorView =
+    div [ class "loading-wrap" ]
+        [ div [ class "loading-bar" ] [] ]
+
+
+viewPlaylistTable : Bool -> List PlaylistItem -> Html Msg
+viewPlaylistTable isLoading list =
+    div [ class "playlist-table" ]
+        (headerRow isLoading :: List.map viewRow list)
 
 
 leftCard : Model -> Service -> ServiceType -> Int -> List ServiceType -> Html Msg

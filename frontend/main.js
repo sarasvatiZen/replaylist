@@ -6558,6 +6558,7 @@ var $author$project$Main$init = F3(
 			currentFromType: curFrom,
 			currentToType: curTo,
 			from: $author$project$Main$serviceFromType(curFrom),
+			isLoading: false,
 			key: key,
 			leftIndex: li,
 			leftList: leftL,
@@ -6670,11 +6671,28 @@ var $elm$http$Http$jsonBody = function (value) {
 		A2($elm$json$Json$Encode$encode, 0, value));
 };
 var $elm$browser$Browser$Navigation$load = _Browser_load;
+var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
+var $elm$url$Url$percentEncode = _Url_percentEncode;
+var $author$project$Main$loginCmd = F2(
+	function (serviceType, model) {
+		var stateStr = 'left=' + ($author$project$Main$encodeList(model.leftList) + ('&right=' + ($author$project$Main$encodeList(model.rightList) + ('&li=' + $elm$core$String$fromInt(model.leftIndex)))));
+		var encodedState = $elm$url$Url$percentEncode(stateStr);
+		switch (serviceType.$) {
+			case 'Apple':
+				return $author$project$Main$appleLogin(_Utils_Tuple0);
+			case 'Spotify':
+				return $elm$browser$Browser$Navigation$load('https://accounts.spotify.com/authorize' + ('?client_id=a0e8851f25054913bffdfec463b47679' + ('&response_type=code' + ('&redirect_uri=https://replaylist.ngrok.io/api/login/spotify/callback' + ('&scope=playlist-read-private+playlist-modify-private' + ('&state=' + encodedState))))));
+			case 'Youtube':
+				return $elm$browser$Browser$Navigation$load(
+					'https://accounts.google.com/o/oauth2/v2/auth' + ('?response_type=code' + ('&client_id=' + ($elm$url$Url$percentEncode('263472270217-7ndt9q7oe9qm0r0dc01jaqu7p712a02h.apps.googleusercontent.com') + ('&redirect_uri=' + ($elm$url$Url$percentEncode('https://replaylist.ngrok.io/api/login/youtube/callback') + ('&scope=' + ($elm$url$Url$percentEncode('https://www.googleapis.com/auth/youtube.readonly') + ('&access_type=offline&include_granted_scopes=true&prompt=consent' + ('&state=' + encodedState))))))))));
+			default:
+				return $elm$core$Platform$Cmd$none;
+		}
+	});
 var $elm$core$Basics$min = F2(
 	function (x, y) {
 		return (_Utils_cmp(x, y) < 0) ? x : y;
 	});
-var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
 var $elm$json$Json$Encode$object = function (pairs) {
 	return _Json_wrap(
 		A3(
@@ -6946,7 +6964,9 @@ var $author$project$Main$update = F2(
 					$author$project$Main$fetchLoginStatus);
 			case 'FetchApplePlaylists':
 				return _Utils_Tuple2(
-					model,
+					_Utils_update(
+						model,
+						{isLoading: true}),
 					$elm$http$Http$get(
 						{
 							expect: $elm$http$Http$expectString($author$project$Main$GotApplePlaylists),
@@ -6954,7 +6974,9 @@ var $author$project$Main$update = F2(
 						}));
 			case 'FetchSpotifyPlaylists':
 				return _Utils_Tuple2(
-					model,
+					_Utils_update(
+						model,
+						{isLoading: true}),
 					$elm$http$Http$get(
 						{
 							expect: $elm$http$Http$expectString($author$project$Main$GotSpotifyPlaylists),
@@ -6970,14 +6992,15 @@ var $author$project$Main$update = F2(
 					return _Utils_Tuple2(
 						_Utils_update(
 							model,
-							{spotifyPlaylists: decoded}),
+							{isLoading: false, spotifyPlaylists: decoded}),
 						$elm$core$Platform$Cmd$none);
 				} else {
 					return _Utils_Tuple2(
 						_Utils_update(
 							model,
 							{
-								spotifyRaw: $elm$core$Maybe$Just('{\"error\":\"failsed to fetch\"}')
+								isLoading: false,
+								spotifyRaw: $elm$core$Maybe$Just('{\"error\":\"failed to fetch\"}')
 							}),
 						$elm$core$Platform$Cmd$none);
 				}
@@ -6991,14 +7014,15 @@ var $author$project$Main$update = F2(
 					return _Utils_Tuple2(
 						_Utils_update(
 							model,
-							{applePlaylists: decoded}),
+							{applePlaylists: decoded, isLoading: false}),
 						$elm$core$Platform$Cmd$none);
 				} else {
 					return _Utils_Tuple2(
 						_Utils_update(
 							model,
 							{
-								appleRaw: $elm$core$Maybe$Just('{\"error\":\"failsed to fetch\"}')
+								appleRaw: $elm$core$Maybe$Just('{\"error\":\"failed to fetch\"}'),
+								isLoading: false
 							}),
 						$elm$core$Platform$Cmd$none);
 				}
@@ -7088,7 +7112,11 @@ var $author$project$Main$update = F2(
 					case 'Spotify':
 						return _Utils_Tuple2(
 							model,
-							$elm$browser$Browser$Navigation$load('/api/login/spotify'));
+							A2($author$project$Main$loginCmd, $author$project$Main$Spotify, model));
+					case 'Youtube':
+						return _Utils_Tuple2(
+							model,
+							A2($author$project$Main$loginCmd, $author$project$Main$Youtube, model));
 					default:
 						return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 				}
@@ -7113,7 +7141,7 @@ var $author$project$Main$update = F2(
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
-						{body: $author$project$Main$List}),
+						{body: $author$project$Main$List, isLoading: true}),
 					cmd);
 			case 'GoDone':
 				return _Utils_Tuple2(
@@ -7217,6 +7245,8 @@ var $author$project$Main$update = F2(
 				return _Utils_Tuple2(
 					model,
 					$author$project$Main$appleLogin(_Utils_Tuple0));
+			case 'TransferSelected':
+				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 			default:
 				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 		}
@@ -7452,6 +7482,7 @@ var $author$project$Main$rightCard = F3(
 var $author$project$Main$ToggleAll = function (a) {
 	return {$: 'ToggleAll', a: a};
 };
+var $author$project$Main$TransferSelected = {$: 'TransferSelected'};
 var $elm$html$Html$input = _VirtualDom_node('input');
 var $elm$json$Json$Decode$at = F2(
 	function (fields, decoder) {
@@ -7469,37 +7500,51 @@ var $elm$html$Html$Events$onCheck = function (tagger) {
 		A2($elm$json$Json$Decode$map, tagger, $elm$html$Html$Events$targetChecked));
 };
 var $elm$html$Html$Attributes$type_ = $elm$html$Html$Attributes$stringProperty('type');
-var $author$project$Main$headerRow = A2(
-	$elm$html$Html$div,
-	_List_fromArray(
-		[
-			$elm$html$Html$Attributes$class('row header')
-		]),
-	_List_fromArray(
-		[
-			A2(
-			$elm$html$Html$input,
-			_List_fromArray(
-				[
-					$elm$html$Html$Attributes$type_('checkbox'),
-					$elm$html$Html$Events$onCheck($author$project$Main$ToggleAll)
-				]),
-			_List_Nil),
-			A2(
-			$elm$html$Html$div,
-			_List_fromArray(
-				[
-					$elm$html$Html$Attributes$class('cell')
-				]),
-			_List_Nil),
-			A2(
-			$elm$html$Html$div,
-			_List_fromArray(
-				[
-					$elm$html$Html$Attributes$class('cell')
-				]),
-			_List_Nil)
-		]));
+var $author$project$Main$headerRow = function (isLoading) {
+	return A2(
+		$elm$html$Html$div,
+		_List_fromArray(
+			[
+				$elm$html$Html$Attributes$class('row playlist-header')
+			]),
+		_List_fromArray(
+			[
+				A2(
+				$elm$html$Html$input,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$type_('checkbox'),
+						$elm$html$Html$Events$onCheck($author$project$Main$ToggleAll)
+					]),
+				_List_Nil),
+				A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('loading-row')
+					]),
+				_List_fromArray(
+					[
+						isLoading ? A2(
+						$elm$html$Html$div,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('loading-bar')
+							]),
+						_List_Nil) : A2(
+						$elm$html$Html$button,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('transfer-btn'),
+								$elm$html$Html$Events$onClick($author$project$Main$TransferSelected)
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('Send Playlists →')
+							]))
+					]))
+			]));
+};
 var $author$project$Main$ToggleOne = F2(
 	function (a, b) {
 		return {$: 'ToggleOne', a: a, b: b};
@@ -7585,18 +7630,19 @@ var $author$project$Main$viewRow = function (p) {
 					]))
 			]));
 };
-var $author$project$Main$viewPlaylistTable = function (list) {
-	return A2(
-		$elm$html$Html$div,
-		_List_fromArray(
-			[
-				$elm$html$Html$Attributes$class('playlist-table')
-			]),
-		A2(
-			$elm$core$List$cons,
-			$author$project$Main$headerRow,
-			A2($elm$core$List$map, $author$project$Main$viewRow, list)));
-};
+var $author$project$Main$viewPlaylistTable = F2(
+	function (isLoading, list) {
+		return A2(
+			$elm$html$Html$div,
+			_List_fromArray(
+				[
+					$elm$html$Html$Attributes$class('playlist-table')
+				]),
+			A2(
+				$elm$core$List$cons,
+				$author$project$Main$headerRow(isLoading),
+				A2($elm$core$List$map, $author$project$Main$viewRow, list)));
+	});
 var $author$project$Main$bodyView = function (model) {
 	var _v0 = model.body;
 	switch (_v0.$) {
@@ -7653,7 +7699,7 @@ var $author$project$Main$bodyView = function (model) {
 						return _List_Nil;
 				}
 			}();
-			return $author$project$Main$viewPlaylistTable(currentList);
+			return A2($author$project$Main$viewPlaylistTable, model.isLoading, currentList);
 		default:
 			return A2(
 				$elm$html$Html$div,

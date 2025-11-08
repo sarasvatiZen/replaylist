@@ -196,21 +196,6 @@ pub async fn fetch_spotify_playlists(access_token: &str) -> anyhow::Result<Vec<P
     Ok(playlists)
 }
 
-#[get("/api/spotify/playlists/raw")]
-pub async fn spotify_raw(session: Session) -> impl Responder {
-    if let Some(access_token) = session
-        .get::<String>("spotify_access_token")
-        .unwrap_or(None)
-    {
-        match fetch_spotify_playlists(&access_token).await {
-            Ok(list) => HttpResponse::Ok().json(list),
-            Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
-        }
-    } else {
-        HttpResponse::Unauthorized().body("Not logged in")
-    }
-}
-
 fn make_apple_dev_token() -> Result<String, String> {
     let private_key_path = env::var("APPLE_PRIVATE_KEY_PATH").map_err(|e| e.to_string())?;
     let key_id = env::var("APPLE_KEY_ID").map_err(|e| e.to_string())?;
@@ -254,6 +239,11 @@ async fn login_callback(
     let service = path.into_inner();
     let _ = session.insert(&service, true);
 
+    let code_opt = q
+        .code
+        .clone()
+        .or_else(|| form.as_ref().and_then(|f| f.code.clone()));
+
     if service == "spotify" {
         if let Some(code) = q
             .code
@@ -285,6 +275,34 @@ async fn login_callback(
             if let Some(rf) = json["refresh_token"].as_str() {
                 let _ = session.insert("spotify_refresh_token", rf.to_string());
             }
+        }
+    } else if service == "youtube" {
+        if let Some(code) = code_opt {
+            let client_id = env::var("GOOGLE_CLIENT_ID").unwrap();
+            let client_secret = env::var("GOOGLE_CLIENT_SECRET").unwrap();
+            let redirect_uri = env::var("GOOGLE_REDIRECT_URI").unwrap();
+
+            let client = reqwest::Client::new();
+            let res = client
+                .post("https://oauth2.googleapis.com/token")
+                .form(&[
+                    ("grant_type", "authorization_code"),
+                    ("code", code.as_str()),
+                    ("redirect_uri", redirect_uri.as_str()),
+                    ("client_id", client_id.as_str()),
+                    ("client_secret", client_secret.as_str()),
+                ])
+                .send()
+                .await
+                .unwrap();
+            let json: serde_json::Value = res.json().await.unwrap();
+            if let Some(acc) = json["access_token"].as_str() {
+                let _ = session.insert("youtube_access_token", acc.to_string());
+            }
+            if let Some(rf) = json["refresh_token"].as_str() {
+                let _ = session.insert("youtube_refresh_token", rf.to_string());
+            }
+            let _ = session.insert("youtube", true);
         }
     }
 
@@ -328,11 +346,15 @@ async fn login_status(session: Session) -> impl Responder {
         .get::<bool>("spotify")
         .unwrap_or(None)
         .unwrap_or(false);
+    let youtube_logged_in = session
+        .get::<bool>("youtube")
+        .unwrap_or(None)
+        .unwrap_or(false);
 
     HttpResponse::Ok().json(serde_json::json!({
         "apple": apple_logged_in,
         "spotify": spotify_logged_in,
-        "youtube": false,
+        "youtube": youtube_logged_in,
         "amazon": false
     }))
 }
@@ -405,6 +427,7 @@ async fn apple_playlists_raw(session: Session) -> impl Responder {
         Err(e) => HttpResponse::InternalServerError().body(format!("request failed: {e}")),
     }
 }
+
 #[get("/api/apple/playlists")]
 async fn apple_playlists(session: Session) -> impl Responder {
     let dev_token = match make_apple_dev_token() {
@@ -463,6 +486,7 @@ async fn spotify_playlists_raw(session: Session) -> impl Responder {
 
     HttpResponse::Ok().json(playlists)
 }
+
 #[get("/api/spotify/playlists")]
 async fn spotify_playlists(session: Session) -> impl Responder {
     if let Some(access_token) = session
@@ -476,6 +500,26 @@ async fn spotify_playlists(session: Session) -> impl Responder {
     } else {
         HttpResponse::Unauthorized().body("not logged in")
     }
+}
+
+#[get("/api/login/google")]
+async fn google_login() -> impl Responder {
+    let client_id = env::var("GOOGLE_CLIENT_ID").unwrap();
+    let redirect_uri = env::var("GOOGLE_REDIRECT_URI").unwrap();
+
+    let url = format!(
+        "https://accounts.google.com/o/oauth2/v2/auth?response_type=code\
+         &client_id={}&redirect_uri={}\
+         &scope={}\
+         &access_type=offline&include_granted_scopes=true&prompt=consent",
+        urlencoding::encode(&client_id),
+        urlencoding::encode(&redirect_uri),
+        urlencoding::encode("https://www.googleapis.com/auth/youtube.readonly")
+    );
+
+    HttpResponse::Found()
+        .append_header(("Location", url))
+        .finish()
 }
 
 #[actix_web::main]
@@ -498,6 +542,7 @@ async fn main() -> std::io::Result<()> {
                     .build(),
             )
             .service(spotify_login)
+            .service(google_login)
             .service(login_callback)
             .service(login_status)
             .service(logout)
