@@ -6566,7 +6566,8 @@ var $author$project$Main$init = F3(
 			rightList: rightL,
 			spotifyPlaylists: _List_Nil,
 			spotifyRaw: $elm$core$Maybe$Nothing,
-			to: $author$project$Main$serviceFromType(curTo)
+			to: $author$project$Main$serviceFromType(curTo),
+			youtubePlaylists: _List_Nil
 		};
 		return _Utils_Tuple2(
 			model,
@@ -6587,11 +6588,15 @@ var $author$project$Main$Done = {$: 'Done'};
 var $author$project$Main$FetchApplePlaylists = {$: 'FetchApplePlaylists'};
 var $author$project$Main$FetchLoginStatusAfterApple = {$: 'FetchLoginStatusAfterApple'};
 var $author$project$Main$FetchSpotifyPlaylists = {$: 'FetchSpotifyPlaylists'};
+var $author$project$Main$FetchYoutubePlaylists = {$: 'FetchYoutubePlaylists'};
 var $author$project$Main$GotApplePlaylists = function (a) {
 	return {$: 'GotApplePlaylists', a: a};
 };
 var $author$project$Main$GotSpotifyPlaylists = function (a) {
 	return {$: 'GotSpotifyPlaylists', a: a};
+};
+var $author$project$Main$GotYoutubePlaylists = function (a) {
+	return {$: 'GotYoutubePlaylists', a: a};
 };
 var $author$project$Main$List = {$: 'List'};
 var $elm$json$Json$Encode$null = _Json_encodeNull;
@@ -6608,6 +6613,30 @@ var $elm$json$Json$Decode$field = _Json_decodeField;
 var $elm$json$Json$Decode$int = _Json_decodeInt;
 var $elm$json$Json$Decode$list = _Json_decodeList;
 var $elm$json$Json$Decode$map6 = _Json_map6;
+var $author$project$Main$Track = F3(
+	function (title, artist, isrc) {
+		return {artist: artist, isrc: isrc, title: title};
+	});
+var $elm$json$Json$Decode$map3 = _Json_map3;
+var $elm$json$Json$Decode$null = _Json_decodeNull;
+var $elm$json$Json$Decode$oneOf = _Json_oneOf;
+var $elm$json$Json$Decode$nullable = function (decoder) {
+	return $elm$json$Json$Decode$oneOf(
+		_List_fromArray(
+			[
+				$elm$json$Json$Decode$null($elm$core$Maybe$Nothing),
+				A2($elm$json$Json$Decode$map, $elm$core$Maybe$Just, decoder)
+			]));
+};
+var $author$project$Main$trackDecoder = A4(
+	$elm$json$Json$Decode$map3,
+	$author$project$Main$Track,
+	A2($elm$json$Json$Decode$field, 'title', $elm$json$Json$Decode$string),
+	A2($elm$json$Json$Decode$field, 'artist', $elm$json$Json$Decode$string),
+	A2(
+		$elm$json$Json$Decode$field,
+		'isrc',
+		$elm$json$Json$Decode$nullable($elm$json$Json$Decode$string)));
 var $author$project$Main$decodePlaylistItem = A7(
 	$elm$json$Json$Decode$map6,
 	$author$project$Main$PlaylistItem,
@@ -6619,9 +6648,10 @@ var $author$project$Main$decodePlaylistItem = A7(
 	A2(
 		$elm$json$Json$Decode$field,
 		'tracks',
-		$elm$json$Json$Decode$list($elm$json$Json$Decode$string)));
+		$elm$json$Json$Decode$list($author$project$Main$trackDecoder)));
 var $author$project$Main$decodeApplePlaylists = $elm$json$Json$Decode$list($author$project$Main$decodePlaylistItem);
 var $author$project$Main$decodeSpotifyPlaylists = $elm$json$Json$Decode$list($author$project$Main$decodePlaylistItem);
+var $author$project$Main$decodeYoutubePlaylists = $elm$json$Json$Decode$list($author$project$Main$decodePlaylistItem);
 var $author$project$Main$serviceKey = function (s) {
 	switch (s.$) {
 		case 'Apple':
@@ -6664,6 +6694,17 @@ var $elm$http$Http$expectWhatever = function (toMsg) {
 				return $elm$core$Result$Ok(_Utils_Tuple0);
 			}));
 };
+var $elm$core$List$filter = F2(
+	function (isGood, list) {
+		return A3(
+			$elm$core$List$foldr,
+			F2(
+				function (x, xs) {
+					return isGood(x) ? A2($elm$core$List$cons, x, xs) : xs;
+				}),
+			_List_Nil,
+			list);
+	});
 var $elm$http$Http$jsonBody = function (value) {
 	return A2(
 		_Http_pair,
@@ -6711,6 +6752,82 @@ var $elm$http$Http$post = function (r) {
 		{body: r.body, expect: r.expect, headers: _List_Nil, method: 'POST', timeout: $elm$core$Maybe$Nothing, tracker: $elm$core$Maybe$Nothing, url: r.url});
 };
 var $elm$browser$Browser$Navigation$pushUrl = _Browser_pushUrl;
+var $author$project$Main$NoOp = {$: 'NoOp'};
+var $elm$json$Json$Encode$int = _Json_wrap;
+var $elm$json$Json$Encode$list = F2(
+	function (func, entries) {
+		return _Json_wrap(
+			A3(
+				$elm$core$List$foldl,
+				_Json_addEntry(func),
+				_Json_emptyArray(_Utils_Tuple0),
+				entries));
+	});
+var $elm$json$Json$Encode$string = _Json_wrap;
+var $author$project$Main$encodePlaylistItem = function (p) {
+	return $elm$json$Json$Encode$object(
+		_List_fromArray(
+			[
+				_Utils_Tuple2(
+				'id',
+				$elm$json$Json$Encode$string(p.id)),
+				_Utils_Tuple2(
+				'name',
+				$elm$json$Json$Encode$string(p.name)),
+				_Utils_Tuple2(
+				'cover',
+				$elm$json$Json$Encode$string(p.cover)),
+				_Utils_Tuple2(
+				'track_count',
+				$elm$json$Json$Encode$int(p.trackCount)),
+				_Utils_Tuple2(
+				'tracks',
+				A2(
+					$elm$json$Json$Encode$list,
+					function (t) {
+						return $elm$json$Json$Encode$object(
+							_List_fromArray(
+								[
+									_Utils_Tuple2(
+									'title',
+									$elm$json$Json$Encode$string(t.title)),
+									_Utils_Tuple2(
+									'artist',
+									$elm$json$Json$Encode$string(t.artist)),
+									_Utils_Tuple2(
+									'isrc',
+									function () {
+										var _v0 = t.isrc;
+										if (_v0.$ === 'Nothing') {
+											return $elm$json$Json$Encode$null;
+										} else {
+											var i = _v0.a;
+											return $elm$json$Json$Encode$string(i);
+										}
+									}())
+								]));
+					},
+					p.tracks))
+			]));
+};
+var $author$project$Main$sendToSpotify = function (p) {
+	return $elm$http$Http$post(
+		{
+			body: $elm$http$Http$jsonBody(
+				$elm$json$Json$Encode$object(
+					_List_fromArray(
+						[
+							_Utils_Tuple2(
+							'playlist',
+							$author$project$Main$encodePlaylistItem(p))
+						]))),
+			expect: $elm$http$Http$expectWhatever(
+				function (_v0) {
+					return $author$project$Main$NoOp;
+				}),
+			url: '/api/transfer/to/spotify'
+		});
+};
 var $elm$core$Basics$always = F2(
 	function (a, _v0) {
 		return a;
@@ -6869,7 +6986,6 @@ var $elm_community$list_extra$List$Extra$setAt = F2(
 			$elm$core$Basics$always(value));
 	});
 var $elm$core$Process$sleep = _Process_sleep;
-var $elm$json$Json$Encode$string = _Json_wrap;
 var $elm$core$Result$withDefault = F2(
 	function (def, result) {
 		if (result.$ === 'Ok') {
@@ -6982,6 +7098,16 @@ var $author$project$Main$update = F2(
 							expect: $elm$http$Http$expectString($author$project$Main$GotSpotifyPlaylists),
 							url: '/api/spotify/playlists'
 						}));
+			case 'FetchYoutubePlaylists':
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{isLoading: true}),
+					$elm$http$Http$get(
+						{
+							expect: $elm$http$Http$expectString($author$project$Main$GotYoutubePlaylists),
+							url: '/api/youtube/playlists'
+						}));
 			case 'GotSpotifyPlaylists':
 				if (msg.a.$ === 'Ok') {
 					var raw = msg.a.a;
@@ -7024,6 +7150,25 @@ var $author$project$Main$update = F2(
 								appleRaw: $elm$core$Maybe$Just('{\"error\":\"failed to fetch\"}'),
 								isLoading: false
 							}),
+						$elm$core$Platform$Cmd$none);
+				}
+			case 'GotYoutubePlaylists':
+				if (msg.a.$ === 'Ok') {
+					var raw = msg.a.a;
+					var decoded = A2(
+						$elm$core$Result$withDefault,
+						_List_Nil,
+						A2($elm$json$Json$Decode$decodeString, $author$project$Main$decodeYoutubePlaylists, raw));
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{isLoading: false, youtubePlaylists: decoded}),
+						$elm$core$Platform$Cmd$none);
+				} else {
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{isLoading: false}),
 						$elm$core$Platform$Cmd$none);
 				}
 			case 'NextService':
@@ -7137,7 +7282,12 @@ var $author$project$Main$update = F2(
 					function (_v9) {
 						return $author$project$Main$FetchApplePlaylists;
 					},
-					$elm$core$Task$succeed(_Utils_Tuple0)) : $elm$core$Platform$Cmd$none);
+					$elm$core$Task$succeed(_Utils_Tuple0)) : (_Utils_eq(model.currentFromType, $author$project$Main$Youtube) ? A2(
+					$elm$core$Task$perform,
+					function (_v10) {
+						return $author$project$Main$FetchYoutubePlaylists;
+					},
+					$elm$core$Task$succeed(_Utils_Tuple0)) : $elm$core$Platform$Cmd$none));
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
@@ -7158,7 +7308,7 @@ var $author$project$Main$update = F2(
 						{
 							body: $elm$http$Http$emptyBody,
 							expect: $elm$http$Http$expectWhatever(
-								function (_v10) {
+								function (_v11) {
 									return $author$project$Main$GotLoginStatus(
 										$elm$core$Result$Ok($elm$core$Dict$empty));
 								}),
@@ -7166,44 +7316,6 @@ var $author$project$Main$update = F2(
 						}));
 			case 'ToggleAll':
 				var state = msg.a;
-				var _v11 = model.currentFromType;
-				switch (_v11.$) {
-					case 'Apple':
-						return _Utils_Tuple2(
-							_Utils_update(
-								model,
-								{
-									applePlaylists: A2(
-										$elm$core$List$map,
-										function (p) {
-											return _Utils_update(
-												p,
-												{checked: state});
-										},
-										model.applePlaylists)
-								}),
-							$elm$core$Platform$Cmd$none);
-					case 'Spotify':
-						return _Utils_Tuple2(
-							_Utils_update(
-								model,
-								{
-									spotifyPlaylists: A2(
-										$elm$core$List$map,
-										function (p) {
-											return _Utils_update(
-												p,
-												{checked: state});
-										},
-										model.spotifyPlaylists)
-								}),
-							$elm$core$Platform$Cmd$none);
-					default:
-						return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-				}
-			case 'ToggleOne':
-				var pid = msg.a;
-				var state = msg.b;
 				var _v12 = model.currentFromType;
 				switch (_v12.$) {
 					case 'Apple':
@@ -7214,6 +7326,59 @@ var $author$project$Main$update = F2(
 									applePlaylists: A2(
 										$elm$core$List$map,
 										function (p) {
+											return _Utils_update(
+												p,
+												{checked: state});
+										},
+										model.applePlaylists)
+								}),
+							$elm$core$Platform$Cmd$none);
+					case 'Spotify':
+						return _Utils_Tuple2(
+							_Utils_update(
+								model,
+								{
+									spotifyPlaylists: A2(
+										$elm$core$List$map,
+										function (p) {
+											return _Utils_update(
+												p,
+												{checked: state});
+										},
+										model.spotifyPlaylists)
+								}),
+							$elm$core$Platform$Cmd$none);
+					case 'Youtube':
+						return _Utils_Tuple2(
+							_Utils_update(
+								model,
+								{
+									youtubePlaylists: A2(
+										$elm$core$List$map,
+										function (p) {
+											return _Utils_update(
+												p,
+												{checked: state});
+										},
+										model.youtubePlaylists)
+								}),
+							$elm$core$Platform$Cmd$none);
+					default:
+						return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+				}
+			case 'ToggleOne':
+				var pid = msg.a;
+				var state = msg.b;
+				var _v13 = model.currentFromType;
+				switch (_v13.$) {
+					case 'Apple':
+						return _Utils_Tuple2(
+							_Utils_update(
+								model,
+								{
+									applePlaylists: A2(
+										$elm$core$List$map,
+										function (p) {
 											return _Utils_eq(p.id, pid) ? _Utils_update(
 												p,
 												{checked: state}) : p;
@@ -7234,6 +7399,21 @@ var $author$project$Main$update = F2(
 												{checked: state}) : p;
 										},
 										model.spotifyPlaylists)
+								}),
+							$elm$core$Platform$Cmd$none);
+					case 'Youtube':
+						return _Utils_Tuple2(
+							_Utils_update(
+								model,
+								{
+									youtubePlaylists: A2(
+										$elm$core$List$map,
+										function (p) {
+											return _Utils_eq(p.id, pid) ? _Utils_update(
+												p,
+												{checked: state}) : p;
+										},
+										model.youtubePlaylists)
 								}),
 							$elm$core$Platform$Cmd$none);
 					default:
@@ -7246,7 +7426,48 @@ var $author$project$Main$update = F2(
 					model,
 					$author$project$Main$appleLogin(_Utils_Tuple0));
 			case 'TransferSelected':
-				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+				var selected = function () {
+					var _v15 = model.currentFromType;
+					switch (_v15.$) {
+						case 'Apple':
+							return A2(
+								$elm$core$List$filter,
+								function ($) {
+									return $.checked;
+								},
+								model.applePlaylists);
+						case 'Spotify':
+							return A2(
+								$elm$core$List$filter,
+								function ($) {
+									return $.checked;
+								},
+								model.spotifyPlaylists);
+						case 'Youtube':
+							return A2(
+								$elm$core$List$filter,
+								function ($) {
+									return $.checked;
+								},
+								model.youtubePlaylists);
+						default:
+							return _List_Nil;
+					}
+				}();
+				var cmd = function () {
+					var _v14 = model.currentToType;
+					if (_v14.$ === 'Spotify') {
+						return $elm$core$Platform$Cmd$batch(
+							A2($elm$core$List$map, $author$project$Main$sendToSpotify, selected));
+					} else {
+						return $elm$core$Platform$Cmd$none;
+					}
+				}();
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{body: $author$project$Main$Done}),
+					cmd);
 			default:
 				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 		}
@@ -7623,7 +7844,7 @@ var $author$project$Main$viewRow = function (p) {
 										]),
 									_List_fromArray(
 										[
-											$elm$html$Html$text(t)
+											$elm$html$Html$text(t.title + (' - ' + t.artist))
 										]));
 							},
 							p.tracks))
@@ -7695,6 +7916,8 @@ var $author$project$Main$bodyView = function (model) {
 						return model.applePlaylists;
 					case 'Spotify':
 						return model.spotifyPlaylists;
+					case 'Youtube':
+						return model.youtubePlaylists;
 					default:
 						return _List_Nil;
 				}

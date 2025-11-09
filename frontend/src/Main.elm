@@ -30,7 +30,7 @@ type alias PlaylistItem =
     , cover : String
     , trackCount : Int
     , checked : Bool
-    , tracks : List String
+    , tracks : List Track
     }
 
 
@@ -45,6 +45,13 @@ type alias Service =
     { name : String
     , icon : String
     , loginLabel : String
+    }
+
+
+type alias Track =
+    { title : String
+    , artist : String
+    , isrc : Maybe String
     }
 
 
@@ -64,6 +71,7 @@ type alias Model =
     , appleUserToken : Maybe String
     , applePlaylists : List PlaylistItem
     , spotifyPlaylists : List PlaylistItem
+    , youtubePlaylists : List PlaylistItem
     , isLoading : Bool
     }
 
@@ -88,8 +96,10 @@ type Msg
     | LogoutAll
     | FetchSpotifyPlaylists
     | FetchApplePlaylists
+    | FetchYoutubePlaylists
     | GotSpotifyPlaylists (Result Http.Error String)
     | GotApplePlaylists (Result Http.Error String)
+    | GotYoutubePlaylists (Result Http.Error String)
     | GotAppleUserToken String
     | ToggleAll Bool
     | ToggleOne String Bool
@@ -97,6 +107,54 @@ type Msg
     | AppleLoginAgain
     | TransferSelected
     | NoOp
+
+
+trackDecoder : D.Decoder Track
+trackDecoder =
+    D.map3 Track
+        (D.field "title" D.string)
+        (D.field "artist" D.string)
+        (D.field "isrc" (D.nullable D.string))
+
+
+encodePlaylistItem : PlaylistItem -> E.Value
+encodePlaylistItem p =
+    E.object
+        [ ( "id", E.string p.id )
+        , ( "name", E.string p.name )
+        , ( "cover", E.string p.cover )
+        , ( "track_count", E.int p.trackCount )
+        , ( "tracks"
+          , E.list
+                (\t ->
+                    E.object
+                        [ ( "title", E.string t.title )
+                        , ( "artist", E.string t.artist )
+                        , ( "isrc"
+                          , case t.isrc of
+                                Nothing ->
+                                    E.null
+
+                                Just i ->
+                                    E.string i
+                          )
+                        ]
+                )
+                p.tracks
+          )
+        ]
+
+
+sendToSpotify : PlaylistItem -> Cmd Msg
+sendToSpotify p =
+    Http.post
+        { url = "/api/transfer/to/spotify"
+        , body =
+            Http.jsonBody <|
+                E.object
+                    [ ( "playlist", encodePlaylistItem p ) ]
+        , expect = Http.expectWhatever (\_ -> NoOp)
+        }
 
 
 init : () -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
@@ -127,6 +185,7 @@ init _ url key =
             , appleUserToken = Nothing
             , applePlaylists = []
             , spotifyPlaylists = []
+            , youtubePlaylists = []
             , isLoading = False
             }
     in
@@ -177,7 +236,12 @@ decodePlaylistItem =
         (D.field "cover" D.string)
         (D.field "track_count" D.int)
         (D.succeed False)
-        (D.field "tracks" (D.list D.string))
+        (D.field "tracks" (D.list trackDecoder))
+
+
+decodeYoutubePlaylists : D.Decoder (List PlaylistItem)
+decodeYoutubePlaylists =
+    D.list decodePlaylistItem
 
 
 decodeSpotifyPlaylists : D.Decoder (List PlaylistItem)
@@ -200,7 +264,10 @@ viewRow p =
             ]
         , div [ class "cell tracks" ]
             [ div [ class "track-list" ]
-                (List.map (\t -> div [ class "track" ] [ text t ]) p.tracks)
+                (List.map
+                    (\t -> div [ class "track" ] [ text (t.title ++ " - " ++ t.artist) ])
+                    p.tracks
+                )
             ]
         ]
 
@@ -324,25 +391,6 @@ loginCmd serviceType model =
             Cmd.none
 
 
-fetchPlaylists : ServiceType -> Cmd Msg
-fetchPlaylists serviceType =
-    case serviceType of
-        Apple ->
-            Http.get
-                { url = "/api/apple/playlists"
-                , expect = Http.expectString GotApplePlaylists
-                }
-
-        Spotify ->
-            Http.get
-                { url = "/api/spotify/playlists"
-                , expect = Http.expectString GotSpotifyPlaylists
-                }
-
-        _ ->
-            Cmd.none
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -412,6 +460,14 @@ update msg model =
                 }
             )
 
+        FetchYoutubePlaylists ->
+            ( { model | isLoading = True }
+            , Http.get
+                { url = "/api/youtube/playlists"
+                , expect = Http.expectString GotYoutubePlaylists
+                }
+            )
+
         GotSpotifyPlaylists (Ok raw) ->
             let
                 decoded =
@@ -433,6 +489,21 @@ update msg model =
 
         GotApplePlaylists (Err _) ->
             ( { model | appleRaw = Just "{\"error\":\"failed to fetch\"}", isLoading = False }, Cmd.none )
+
+        GotYoutubePlaylists (Ok raw) ->
+            let
+                decoded =
+                    D.decodeString decodeYoutubePlaylists raw
+                        |> Result.withDefault []
+            in
+            ( { model | youtubePlaylists = decoded, isLoading = False }
+            , Cmd.none
+            )
+
+        GotYoutubePlaylists (Err _) ->
+            ( { model | isLoading = False }
+            , Cmd.none
+            )
 
         NextService ->
             let
@@ -532,6 +603,9 @@ update msg model =
                     else if model.currentFromType == Apple then
                         Task.perform (\_ -> FetchApplePlaylists) (Task.succeed ())
 
+                    else if model.currentFromType == Youtube then
+                        Task.perform (\_ -> FetchYoutubePlaylists) (Task.succeed ())
+
                     else
                         Cmd.none
             in
@@ -561,6 +635,13 @@ update msg model =
                 Spotify ->
                     ( { model
                         | spotifyPlaylists = List.map (\p -> { p | checked = state }) model.spotifyPlaylists
+                      }
+                    , Cmd.none
+                    )
+
+                Youtube ->
+                    ( { model
+                        | youtubePlaylists = List.map (\p -> { p | checked = state }) model.youtubePlaylists
                       }
                     , Cmd.none
                     )
@@ -602,6 +683,22 @@ update msg model =
                     , Cmd.none
                     )
 
+                Youtube ->
+                    ( { model
+                        | youtubePlaylists =
+                            List.map
+                                (\p ->
+                                    if p.id == pid then
+                                        { p | checked = state }
+
+                                    else
+                                        p
+                                )
+                                model.youtubePlaylists
+                      }
+                    , Cmd.none
+                    )
+
                 _ ->
                     ( model, Cmd.none )
 
@@ -612,7 +709,30 @@ update msg model =
             ( model, appleLogin () )
 
         TransferSelected ->
-            ( model, Cmd.none )
+            let
+                selected =
+                    case model.currentFromType of
+                        Apple ->
+                            List.filter .checked model.applePlaylists
+
+                        Spotify ->
+                            List.filter .checked model.spotifyPlaylists
+
+                        Youtube ->
+                            List.filter .checked model.youtubePlaylists
+
+                        _ ->
+                            []
+
+                cmd =
+                    case model.currentToType of
+                        Spotify ->
+                            Cmd.batch (List.map sendToSpotify selected)
+
+                        _ ->
+                            Cmd.none
+            in
+            ( { model | body = Done }, cmd )
 
         NoOp ->
             ( model, Cmd.none )
@@ -792,6 +912,9 @@ bodyView model =
 
                         Spotify ->
                             model.spotifyPlaylists
+
+                        Youtube ->
+                            model.youtubePlaylists
 
                         _ ->
                             []

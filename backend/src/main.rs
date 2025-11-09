@@ -1,4 +1,3 @@
-use crate::reqwest::Client;
 use actix_files::Files;
 use actix_session::{Session, SessionMiddleware, storage::CookieSessionStore};
 use actix_web::cookie::{Key, SameSite};
@@ -6,20 +5,155 @@ use actix_web::{App, HttpResponse, HttpServer, Responder, get, post, route, web}
 use base64::{Engine as _, engine::general_purpose};
 use dotenv::dotenv;
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
-use reqwest;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
     time::{SystemTime, UNIX_EPOCH},
 };
 
-#[derive(Serialize)]
+#[derive(Deserialize)]
+struct TransferPayload {
+    playlist: PlaylistItem,
+}
+
+#[post("/api/transfer/to/spotify")]
+async fn transfer_to_spotify(
+    session: Session,
+    payload: web::Json<TransferPayload>,
+) -> impl Responder {
+    match create_playlist_to_spotify(&session, &payload.playlist).await {
+        Ok(_) => HttpResponse::Ok().body("ok"),
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+    }
+}
+
+pub async fn create_playlist_to_spotify(
+    session: &Session,
+    playlist: &PlaylistItem,
+) -> anyhow::Result<()> {
+    let refresh = session
+        .get::<String>("spotify_refresh_token")?
+        .ok_or_else(|| anyhow::anyhow!("no spotify_refresh_token"))?;
+
+    let client_id = env::var("SPOTIFY_CLIENT_ID")?;
+    let client_secret = env::var("SPOTIFY_CLIENT_SECRET")?;
+
+    let client = reqwest::Client::new();
+
+    let token_res = client
+        .post("https://accounts.spotify.com/api/token")
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh.as_str()),
+        ])
+        .basic_auth(client_id, Some(client_secret))
+        .send()
+        .await?;
+
+    let json: serde_json::Value = token_res.json().await?;
+    let access = json["access_token"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("no access token"))?;
+
+    let me: serde_json::Value = client
+        .get("https://api.spotify.com/v1/me")
+        .bearer_auth(access)
+        .send()
+        .await?
+        .json()
+        .await?;
+    let user_id = me["id"].as_str().unwrap();
+
+    let create_res: serde_json::Value = client
+        .post(format!(
+            "https://api.spotify.com/v1/users/{}/playlists",
+            user_id
+        ))
+        .bearer_auth(access)
+        .json(&serde_json::json!({
+            "name": playlist.name,
+            "public": false
+        }))
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    let new_playlist_id = create_res["id"].as_str().unwrap();
+
+    for track in &playlist.tracks {
+        let uri = if let Some(ref isrc) = track.isrc {
+            //ISRC検索
+            let q = format!("isrc:{}", isrc);
+
+            let search: serde_json::Value = client
+                .get("https://api.spotify.com/v1/search")
+                .query(&[("q", q.as_str()), ("type", "track"), ("limit", "1")])
+                .bearer_auth(access)
+                .send()
+                .await?
+                .json()
+                .await?;
+
+            search["tracks"]["items"]
+                .as_array()
+                .and_then(|items| items.get(0))
+                .and_then(|item| item["uri"].as_str())
+                .map(|s| s.to_string())
+        } else {
+            //タイトル+アーティスト検索
+            let query = format!("track:\"{}\" artist:\"{}\"", track.title, track.artist);
+
+            let search: serde_json::Value = client
+                .get("https://api.spotify.com/v1/search")
+                .query(&[
+                    ("q", query),
+                    ("type", "track".into()),
+                    ("limit", "1".into()),
+                ])
+                .bearer_auth(access)
+                .send()
+                .await?
+                .json()
+                .await?;
+
+            search["tracks"]["items"]
+                .as_array()
+                .and_then(|items| items.get(0))
+                .and_then(|item| item["uri"].as_str())
+                .map(|s| s.to_string())
+        };
+
+        if let Some(uri) = uri {
+            client
+                .post(format!(
+                    "https://api.spotify.com/v1/playlists/{}/tracks",
+                    new_playlist_id
+                ))
+                .bearer_auth(access)
+                .json(&serde_json::json!({ "uris": [uri] }))
+                .send()
+                .await?;
+        }
+    }
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Track {
+    pub title: String,
+    pub artist: String,
+    pub isrc: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PlaylistItem {
-    id: String,
-    name: String,
-    cover: String,
-    track_count: usize,
-    tracks: Vec<String>,
+    pub id: String,
+    pub name: String,
+    pub cover: String,
+    pub track_count: usize,
+    pub tracks: Vec<Track>,
 }
 
 #[derive(Deserialize)]
@@ -57,7 +191,7 @@ async fn spotify_login() -> impl Responder {
     let redirect_uri = env::var("SPOTIFY_REDIRECT_URI").unwrap();
 
     let url = format!(
-        "https://accounts.spotify.com/authorize?client_id={}&response_type=code&redirect_uri={}&scope=playlist-read-private%20playlist-modify-private",
+        "https://accounts.spotify.com/authorize?client_id={}&response_type=code&redirect_uri={}&scope=playlist-read-private%20playlist-modify-private%20playlist-modify-public",
         client_id,
         urlencoding::encode(&redirect_uri)
     );
@@ -121,7 +255,13 @@ pub async fn fetch_apple_playlists(
                 for track in track_items {
                     let title = track["attributes"]["name"].as_str().unwrap_or("");
                     let artist = track["attributes"]["artistName"].as_str().unwrap_or("");
-                    tracks.push(format!("{} - {}", title, artist));
+                    let isrc = track["attributes"]["isrc"].as_str().map(|s| s.to_string());
+
+                    tracks.push(Track {
+                        title: title.to_string(),
+                        artist: artist.to_string(),
+                        isrc,
+                    });
                 }
             }
 
@@ -179,7 +319,15 @@ pub async fn fetch_spotify_playlists(access_token: &str) -> anyhow::Result<Vec<P
                 for item in items {
                     let title = item["track"]["name"].as_str().unwrap_or("");
                     let artist = item["track"]["artists"][0]["name"].as_str().unwrap_or("");
-                    tracks.push(format!("{} - {}", title, artist));
+                    let isrc = item["track"]["external_ids"]["isrc"]
+                        .as_str()
+                        .map(|s| s.to_string());
+
+                    tracks.push(Track {
+                        title: title.to_string(),
+                        artist: artist.to_string(),
+                        isrc,
+                    });
                 }
             }
 
@@ -193,6 +341,76 @@ pub async fn fetch_spotify_playlists(access_token: &str) -> anyhow::Result<Vec<P
         }
     }
 
+    Ok(playlists)
+}
+
+pub async fn fetch_youtube_playlists(access_token: &str) -> anyhow::Result<Vec<PlaylistItem>> {
+    let client = Client::new();
+
+    let playlists_resp: serde_json::Value = client
+        .get("https://www.googleapis.com/youtube/v3/playlists")
+        .query(&[("part", "snippet"), ("mine", "true"), ("maxResults", "50")])
+        .bearer_auth(access_token)
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    let mut playlists = Vec::new();
+
+    if let Some(items) = playlists_resp["items"].as_array() {
+        for pl in items {
+            let id = pl["id"].as_str().unwrap_or("").to_string();
+            let name = pl["snippet"]["title"].as_str().unwrap_or("").to_string();
+            let cover = pl["snippet"]["thumbnails"]["medium"]["url"]
+                .as_str()
+                .unwrap_or("")
+                .to_string();
+
+            let tracks_resp: serde_json::Value = client
+                .get("https://www.googleapis.com/youtube/v3/playlistItems")
+                .query(&[
+                    ("part", "snippet"),
+                    ("playlistId", id.as_str()),
+                    ("maxResults", "50"),
+                ])
+                .bearer_auth(access_token)
+                .send()
+                .await?
+                .json()
+                .await?;
+
+            let mut tracks = Vec::new();
+            if let Some(video_items) = tracks_resp["items"].as_array() {
+                for item in video_items {
+                    let title = item["snippet"]["title"].as_str().unwrap_or("");
+                    let mut artist = item["snippet"]["videoOwnerChannelTitle"]
+                        .as_str()
+                        .unwrap_or("")
+                        .to_string();
+
+                    //なんか公式にはTopicって表示されるらしいから消す
+                    if artist.ends_with(" - Topic") {
+                        artist = artist.trim_end_matches(" - Topic").to_string();
+                    }
+
+                    tracks.push(Track {
+                        title: title.to_string(),
+                        artist: artist.to_string(),
+                        isrc: None,
+                    });
+                }
+            }
+
+            playlists.push(PlaylistItem {
+                id,
+                name,
+                cover,
+                track_count: tracks.len(),
+                tracks,
+            });
+        }
+    }
     Ok(playlists)
 }
 
@@ -296,6 +514,7 @@ async fn login_callback(
                 .await
                 .unwrap();
             let json: serde_json::Value = res.json().await.unwrap();
+
             if let Some(acc) = json["access_token"].as_str() {
                 let _ = session.insert("youtube_access_token", acc.to_string());
             }
@@ -343,9 +562,9 @@ async fn login_status(session: Session) -> impl Responder {
         .unwrap_or(None)
         .is_some();
     let spotify_logged_in = session
-        .get::<bool>("spotify")
+        .get::<String>("spotify_access_token")
         .unwrap_or(None)
-        .unwrap_or(false);
+        .is_some();
     let youtube_logged_in = session
         .get::<bool>("youtube")
         .unwrap_or(None)
@@ -368,10 +587,23 @@ async fn logout(path: web::Path<String>, session: Session) -> impl Responder {
 
 #[post("/api/logout_all")]
 async fn logout_all(session: Session) -> impl Responder {
-    for s in ["apple", "spotify", "youtube", "amazon"] {
-        session.remove(s);
+    for key in [
+        "apple_user_token",
+        "spotify_access_token",
+        "spotify_refresh_token",
+        "youtube_access_token",
+        "youtube_refresh_token",
+        "apple",
+        "spotify",
+        "youtube",
+        "amazon",
+    ] {
+        session.remove(key);
     }
-    HttpResponse::Ok().json(serde_json::json!({ "message": "logout all ok" }))
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "message": "logout all ok"
+    }))
 }
 
 fn make_secret_key() -> Key {
@@ -387,6 +619,67 @@ fn make_secret_key() -> Key {
         Key::from(&arr)
     } else {
         Key::generate()
+    }
+}
+
+#[get("/api/youtube/playlists/raw")]
+async fn youtube_playlists_raw(session: Session) -> impl Responder {
+    let refresh = match session
+        .get::<String>("youtube_refresh_token")
+        .unwrap_or(None)
+    {
+        Some(t) => t,
+        None => return HttpResponse::BadRequest().body("no youtube refresh token"),
+    };
+
+    let client_id = env::var("GOOGLE_CLIENT_ID").unwrap();
+    let client_secret = env::var("GOOGLE_CLIENT_SECRET").unwrap();
+    let redirect_uri = env::var("GOOGLE_REDIRECT_URI").unwrap();
+
+    let client = reqwest::Client::new();
+
+    let token_res = client
+        .post("https://oauth2.googleapis.com/token")
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh.as_str()),
+            ("client_id", client_id.as_str()),
+            ("client_secret", client_secret.as_str()),
+            ("redirect_uri", redirect_uri.as_str()),
+        ])
+        .send()
+        .await
+        .unwrap();
+
+    let json: serde_json::Value = token_res.json().await.unwrap();
+    let access = json["access_token"].as_str().unwrap();
+
+    let playlists = client
+        .get("https://www.googleapis.com/youtube/v3/playlists")
+        .query(&[("part", "snippet"), ("mine", "true"), ("maxResults", "50")])
+        .bearer_auth(access)
+        .send()
+        .await
+        .unwrap()
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+
+    HttpResponse::Ok().json(playlists)
+}
+
+#[get("/api/youtube/playlists")]
+async fn youtube_playlists(session: Session) -> impl Responder {
+    if let Some(access_token) = session
+        .get::<String>("youtube_access_token")
+        .unwrap_or(None)
+    {
+        match fetch_youtube_playlists(&access_token).await {
+            Ok(list) => HttpResponse::Ok().json(list),
+            Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+        }
+    } else {
+        HttpResponse::Unauthorized().body("not logged in")
     }
 }
 
@@ -502,8 +795,8 @@ async fn spotify_playlists(session: Session) -> impl Responder {
     }
 }
 
-#[get("/api/login/google")]
-async fn google_login() -> impl Responder {
+#[get("/api/login/youtube")]
+async fn youtube_login() -> impl Responder {
     let client_id = env::var("GOOGLE_CLIENT_ID").unwrap();
     let redirect_uri = env::var("GOOGLE_REDIRECT_URI").unwrap();
 
@@ -514,7 +807,7 @@ async fn google_login() -> impl Responder {
          &access_type=offline&include_granted_scopes=true&prompt=consent",
         urlencoding::encode(&client_id),
         urlencoding::encode(&redirect_uri),
-        urlencoding::encode("https://www.googleapis.com/auth/youtube.readonly")
+        urlencoding::encode("https://www.googleapis.com/auth/youtube")
     );
 
     HttpResponse::Found()
@@ -536,13 +829,13 @@ async fn main() -> std::io::Result<()> {
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), secret_key.clone())
                     .cookie_name("replaylist.sid".into())
-                    .cookie_secure(true)
+                    .cookie_secure(false)
                     .cookie_same_site(SameSite::None)
                     .cookie_http_only(true)
                     .build(),
             )
             .service(spotify_login)
-            .service(google_login)
+            .service(youtube_login)
             .service(login_callback)
             .service(login_status)
             .service(logout)
@@ -551,8 +844,11 @@ async fn main() -> std::io::Result<()> {
             .service(save_user_token)
             .service(apple_playlists_raw)
             .service(spotify_playlists_raw)
+            .service(youtube_playlists_raw)
             .service(apple_playlists)
             .service(spotify_playlists)
+            .service(youtube_playlists)
+            .service(transfer_to_spotify)
             .service(Files::new("/", "../frontend").index_file("index.html"))
     })
     .bind(bind_addr)?
