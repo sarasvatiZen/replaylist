@@ -28,6 +28,109 @@ async fn transfer_to_spotify(
     }
 }
 
+#[post("/api/transfer/to/apple")]
+async fn transfer_to_apple(
+    session: Session,
+    payload: web::Json<TransferPayload>,
+) -> impl Responder {
+    match create_playlist_to_apple(&session, &payload.playlist).await {
+        Ok(_) => HttpResponse::Ok().body("ok"),
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+    }
+}
+
+pub async fn create_playlist_to_apple(
+    session: &Session,
+    playlist: &PlaylistItem,
+) -> anyhow::Result<()> {
+    let dev_token = make_apple_dev_token().map_err(anyhow::Error::msg)?;
+    let user_token = session
+        .get::<String>("apple_user_token")?
+        .ok_or_else(|| anyhow::anyhow!("no apple_user_token in session"))?;
+
+    let client = reqwest::Client::builder().gzip(true).build()?;
+
+    let resp = client
+        .post("https://api.music.apple.com/v1/me/library/playlists")
+        .header("Authorization", format!("Bearer {}", dev_token))
+        .header("Music-User-Token", &user_token)
+        .json(&serde_json::json!({ "attributes": { "name": playlist.name } }))
+        .send()
+        .await?;
+
+    let status = resp.status();
+    let body = resp.text().await?;
+
+    if !status.is_success() {
+        anyhow::bail!("create playlist failed: {}", body);
+    }
+
+    let v: serde_json::Value = serde_json::from_str(&body)?;
+    let playlist_id = v["data"][0]["id"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("failed to extract playlist id"))?
+        .to_string();
+
+    for track in &playlist.tracks {
+        let catalog_id = if let Some(isrc) = &track.isrc {
+            let v = client
+                .get("https://api.music.apple.com/v1/catalog/jp/songs")
+                .header("Authorization", format!("Bearer {}", dev_token))
+                .query(&[("filter[isrc]", isrc)])
+                .send()
+                .await?
+                .json::<serde_json::Value>()
+                .await?;
+
+            v["data"]
+                .as_array()
+                .and_then(|arr| arr.first())
+                .and_then(|song| song["id"].as_str())
+                .map(|s| s.to_string())
+        } else {
+            let q = format!("{} {}", track.title, track.artist);
+            let v = client
+                .get("https://api.music.apple.com/v1/catalog/jp/search")
+                .header("Authorization", format!("Bearer {}", dev_token))
+                .query(&[("term", q.as_str()), ("types", "songs"), ("limit", "1")])
+                .send()
+                .await?
+                .json::<serde_json::Value>()
+                .await?;
+
+            v["results"]["songs"]["data"]
+                .as_array()
+                .and_then(|arr| arr.first())
+                .and_then(|s| s["id"].as_str())
+                .map(|s| s.to_string())
+        };
+
+        let Some(catalog_id) = catalog_id else {
+            continue;
+        };
+
+        client
+            .post(format!(
+                "https://api.music.apple.com/v1/me/library/playlists/{}/tracks",
+                playlist_id
+            ))
+            .header("Authorization", format!("Bearer {}", dev_token))
+            .header("Music-User-Token", &user_token)
+            .json(&serde_json::json!({
+                "data": [{ "id": catalog_id, "type": "catalog-songs" }]
+            }))
+            .send()
+            .await?;
+    }
+    Ok(())
+}
+
+#[post("/api/apple/save_token")]
+async fn save_apple_user_token(session: Session, body: String) -> impl Responder {
+    session.insert("apple_user_token", body).unwrap();
+    HttpResponse::Ok()
+}
+
 pub async fn create_playlist_to_spotify(
     session: &Session,
     playlist: &PlaylistItem,
@@ -849,6 +952,8 @@ async fn main() -> std::io::Result<()> {
             .service(spotify_playlists)
             .service(youtube_playlists)
             .service(transfer_to_spotify)
+            .service(transfer_to_apple)
+            .service(save_apple_user_token)
             .service(Files::new("/", "../frontend").index_file("index.html"))
     })
     .bind(bind_addr)?

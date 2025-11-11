@@ -157,6 +157,16 @@ sendToSpotify p =
         }
 
 
+sendToApple : PlaylistItem -> Cmd Msg
+sendToApple p =
+    Http.post
+        { url = "/api/transfer/to/apple"
+        , body =
+            Http.jsonBody <| E.object [ ( "playlist", encodePlaylistItem p ) ]
+        , expect = Http.expectWhatever (\_ -> NoOp)
+        }
+
+
 init : () -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
     let
@@ -728,6 +738,9 @@ update msg model =
                     case model.currentToType of
                         Spotify ->
                             Cmd.batch (List.map sendToSpotify selected)
+
+                        Apple ->
+                            Cmd.batch (List.map sendToApple selected)
 
                         _ ->
                             Cmd.none

@@ -6810,6 +6810,24 @@ var $author$project$Main$encodePlaylistItem = function (p) {
 					p.tracks))
 			]));
 };
+var $author$project$Main$sendToApple = function (p) {
+	return $elm$http$Http$post(
+		{
+			body: $elm$http$Http$jsonBody(
+				$elm$json$Json$Encode$object(
+					_List_fromArray(
+						[
+							_Utils_Tuple2(
+							'playlist',
+							$author$project$Main$encodePlaylistItem(p))
+						]))),
+			expect: $elm$http$Http$expectWhatever(
+				function (_v0) {
+					return $author$project$Main$NoOp;
+				}),
+			url: '/api/transfer/to/apple'
+		});
+};
 var $author$project$Main$sendToSpotify = function (p) {
 	return $elm$http$Http$post(
 		{
@@ -7456,11 +7474,15 @@ var $author$project$Main$update = F2(
 				}();
 				var cmd = function () {
 					var _v14 = model.currentToType;
-					if (_v14.$ === 'Spotify') {
-						return $elm$core$Platform$Cmd$batch(
-							A2($elm$core$List$map, $author$project$Main$sendToSpotify, selected));
-					} else {
-						return $elm$core$Platform$Cmd$none;
+					switch (_v14.$) {
+						case 'Spotify':
+							return $elm$core$Platform$Cmd$batch(
+								A2($elm$core$List$map, $author$project$Main$sendToSpotify, selected));
+						case 'Apple':
+							return $elm$core$Platform$Cmd$batch(
+								A2($elm$core$List$map, $author$project$Main$sendToApple, selected));
+						default:
+							return $elm$core$Platform$Cmd$none;
 					}
 				}();
 				return _Utils_Tuple2(
