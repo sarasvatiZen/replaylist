@@ -17,6 +17,17 @@ struct TransferPayload {
     playlist: PlaylistItem,
 }
 
+#[post("/api/transfer/to/youtube")]
+async fn transfer_to_youtube(
+    session: Session,
+    payload: web::Json<TransferPayload>,
+) -> impl Responder {
+    match create_playlist_to_youtube(&session, &payload.playlist).await {
+        Ok(_) => HttpResponse::Ok().body("ok"),
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+    }
+}
+
 #[post("/api/transfer/to/spotify")]
 async fn transfer_to_spotify(
     session: Session,
@@ -37,6 +48,72 @@ async fn transfer_to_apple(
         Ok(_) => HttpResponse::Ok().body("ok"),
         Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
     }
+}
+
+pub async fn create_playlist_to_youtube(
+    session: &Session,
+    playlist: &PlaylistItem,
+) -> anyhow::Result<()> {
+    let access_token = session
+        .get::<String>("youtube_access_token")?
+        .ok_or_else(|| anyhow::anyhow!("no youtube_access_token"))?;
+
+    let client = reqwest::Client::new();
+
+    let create_res: serde_json::Value = client
+        .post("https://www.googleapis.com/youtube/v3/playlists?part=snippet,status")
+        .bearer_auth(&access_token)
+        .json(&serde_json::json!({
+            "snippet": {"title": playlist.name},
+            "status": {"privacyStatus": "private"}
+        }))
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    let playlist_id = create_res["id"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("failed to get playlist id"))?;
+
+    for track in &playlist.tracks {
+        let query = format!("{} {}", track.title, track.artist);
+        let search: serde_json::Value = client
+            .get("https://www.googleapis.com/youtube/v3/search")
+            .bearer_auth(&access_token)
+            .query(&[
+                ("part", "snippet"),
+                ("type", "video"),
+                ("maxResults", "1"),
+                ("q", &query),
+            ])
+            .send()
+            .await?
+            .json()
+            .await?;
+
+        if let Some(video_id) = search["items"]
+            .as_array()
+            .and_then(|arr| arr.first())
+            .and_then(|v| v["id"]["videoId"].as_str())
+        {
+            client
+                .post("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet")
+                .bearer_auth(&access_token)
+                .json(&serde_json::json!({
+                    "snippet": {
+                        "playlistId": playlist_id,
+                        "resourceId": {
+                            "kind": "youtube#video",
+                            "videoId": video_id
+                        }
+                    }
+                }))
+                .send()
+                .await?;
+        }
+    }
+    Ok(())
 }
 
 pub async fn create_playlist_to_apple(
@@ -910,7 +987,7 @@ async fn youtube_login() -> impl Responder {
          &access_type=offline&include_granted_scopes=true&prompt=consent",
         urlencoding::encode(&client_id),
         urlencoding::encode(&redirect_uri),
-        urlencoding::encode("https://www.googleapis.com/auth/youtube")
+        urlencoding::encode("https://www.googleapis.com/auth/youtube.force-ssl")
     );
 
     HttpResponse::Found()
@@ -953,6 +1030,7 @@ async fn main() -> std::io::Result<()> {
             .service(youtube_playlists)
             .service(transfer_to_spotify)
             .service(transfer_to_apple)
+            .service(transfer_to_youtube)
             .service(save_apple_user_token)
             .service(Files::new("/", "../frontend").index_file("index.html"))
     })

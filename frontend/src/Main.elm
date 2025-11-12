@@ -145,6 +145,18 @@ encodePlaylistItem p =
         ]
 
 
+sendToYoutube : PlaylistItem -> Cmd Msg
+sendToYoutube p =
+    Http.post
+        { url = "/api/transfer/to/youtube"
+        , body =
+            Http.jsonBody <|
+                E.object
+                    [ ( "playlist", encodePlaylistItem p ) ]
+        , expect = Http.expectWhatever (\_ -> NoOp)
+        }
+
+
 sendToSpotify : PlaylistItem -> Cmd Msg
 sendToSpotify p =
     Http.post
@@ -741,6 +753,9 @@ update msg model =
 
                         Apple ->
                             Cmd.batch (List.map sendToApple selected)
+
+                        Youtube ->
+                            Cmd.batch (List.map sendToYoutube selected)
 
                         _ ->
                             Cmd.none

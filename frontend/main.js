@@ -6846,6 +6846,24 @@ var $author$project$Main$sendToSpotify = function (p) {
 			url: '/api/transfer/to/spotify'
 		});
 };
+var $author$project$Main$sendToYoutube = function (p) {
+	return $elm$http$Http$post(
+		{
+			body: $elm$http$Http$jsonBody(
+				$elm$json$Json$Encode$object(
+					_List_fromArray(
+						[
+							_Utils_Tuple2(
+							'playlist',
+							$author$project$Main$encodePlaylistItem(p))
+						]))),
+			expect: $elm$http$Http$expectWhatever(
+				function (_v0) {
+					return $author$project$Main$NoOp;
+				}),
+			url: '/api/transfer/to/youtube'
+		});
+};
 var $elm$core$Basics$always = F2(
 	function (a, _v0) {
 		return a;
@@ -7481,6 +7499,9 @@ var $author$project$Main$update = F2(
 						case 'Apple':
 							return $elm$core$Platform$Cmd$batch(
 								A2($elm$core$List$map, $author$project$Main$sendToApple, selected));
+						case 'Youtube':
+							return $elm$core$Platform$Cmd$batch(
+								A2($elm$core$List$map, $author$project$Main$sendToYoutube, selected));
 						default:
 							return $elm$core$Platform$Cmd$none;
 					}
