@@ -73,6 +73,9 @@ type alias Model =
     , spotifyPlaylists : List PlaylistItem
     , youtubePlaylists : List PlaylistItem
     , isLoading : Bool
+    , totalTransfers : Int
+    , totalTransfersFinished : Int
+    , transferDone : Bool
     }
 
 
@@ -106,6 +109,7 @@ type Msg
     | FetchLoginStatusAfterApple
     | AppleLoginAgain
     | TransferSelected
+    | TransferFinished (Result Http.Error String)
     | NoOp
 
 
@@ -153,7 +157,7 @@ sendToYoutube p =
             Http.jsonBody <|
                 E.object
                     [ ( "playlist", encodePlaylistItem p ) ]
-        , expect = Http.expectWhatever (\_ -> NoOp)
+        , expect = Http.expectString TransferFinished
         }
 
 
@@ -165,7 +169,7 @@ sendToSpotify p =
             Http.jsonBody <|
                 E.object
                     [ ( "playlist", encodePlaylistItem p ) ]
-        , expect = Http.expectWhatever (\_ -> NoOp)
+        , expect = Http.expectString TransferFinished
         }
 
 
@@ -175,7 +179,7 @@ sendToApple p =
         { url = "/api/transfer/to/apple"
         , body =
             Http.jsonBody <| E.object [ ( "playlist", encodePlaylistItem p ) ]
-        , expect = Http.expectWhatever (\_ -> NoOp)
+        , expect = Http.expectString TransferFinished
         }
 
 
@@ -209,6 +213,9 @@ init _ url key =
             , spotifyPlaylists = []
             , youtubePlaylists = []
             , isLoading = False
+            , totalTransfers = 0
+            , totalTransfersFinished = 0
+            , transferDone = False
             }
     in
     ( model
@@ -759,8 +766,50 @@ update msg model =
 
                         _ ->
                             Cmd.none
+
+                total =
+                    List.length selected
             in
-            ( { model | body = Done }, cmd )
+            if List.isEmpty selected then
+                ( model, Cmd.none )
+
+            else
+                ( { model
+                    | body = Done
+                    , transferDone = False
+                    , totalTransfers = total
+                    , totalTransfersFinished = 0
+                  }
+                , cmd
+                )
+
+        -- プレイリスト一つにつき一個のAPIなのでバックエンドを二重for文にするのではなく
+        -- プレイリスト移行に成功した数が選択したプレイリストと同数になったら
+        -- TransferDoneをTrueにすることで読み込みバーを停止する
+        TransferFinished result ->
+            case result of
+                Ok "ok" ->
+                    let
+                        finished =
+                            model.totalTransfersFinished + 1
+                    in
+                    if finished == model.totalTransfers then
+                        ( { model
+                            | totalTransfersFinished = finished
+                            , transferDone = True
+                          }
+                        , Cmd.none
+                        )
+
+                    else
+                        ( { model
+                            | totalTransfersFinished = finished
+                          }
+                        , Cmd.none
+                        )
+
+                _ ->
+                    ( { model | transferDone = False }, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
@@ -933,24 +982,46 @@ bodyView model =
 
         List ->
             let
-                currentList =
-                    case model.currentFromType of
-                        Apple ->
-                            model.applePlaylists
+                loggedInList =
+                    model.loginStatuses
+                        |> Dict.toList
+                        |> List.filterMap
+                            (\( k, v ) ->
+                                if v then
+                                    keyToServiceType k
 
-                        Spotify ->
-                            model.spotifyPlaylists
+                                else
+                                    Nothing
+                            )
 
-                        Youtube ->
-                            model.youtubePlaylists
-
-                        _ ->
-                            []
+                bothLoggedIn =
+                    List.member model.currentFromType loggedInList
+                        && List.member model.currentToType loggedInList
             in
-            viewPlaylistTable model.isLoading currentList
+            if bothLoggedIn then
+                let
+                    currentList =
+                        case model.currentFromType of
+                            Apple ->
+                                model.applePlaylists
+
+                            Spotify ->
+                                model.spotifyPlaylists
+
+                            Youtube ->
+                                model.youtubePlaylists
+
+                            _ ->
+                                []
+                in
+                viewPlaylistTable model.isLoading currentList
+
+            else
+                div []
+                    [ text "移行元と移行先のサービスにログインしてください。" ]
 
         Done ->
-            div [] [ text "Hello, Body3", button [ onClick GoHome ] [ text "Back to Body1" ] ]
+            viewDone model
 
 
 headerRow : Bool -> Html Msg
@@ -1045,46 +1116,75 @@ rightCard model service currentToType =
 
 footerView : Model -> Html Msg
 footerView model =
-    let
-        loggedInList : List ServiceType
-        loggedInList =
-            model.loginStatuses
-                |> Dict.toList
-                |> List.filterMap
-                    (\( k, v ) ->
-                        if v then
-                            keyToServiceType k
+    case model.body of
+        Home ->
+            let
+                loggedInList : List ServiceType
+                loggedInList =
+                    model.loginStatuses
+                        |> Dict.toList
+                        |> List.filterMap
+                            (\( k, v ) ->
+                                if v then
+                                    keyToServiceType k
 
-                        else
-                            Nothing
+                                else
+                                    Nothing
+                            )
+
+                bothLoggedIn =
+                    List.member model.currentFromType loggedInList
+                        && List.member model.currentToType loggedInList
+
+                loggedInText =
+                    if List.isEmpty loggedInList then
+                        "まだログインしていません"
+
+                    else
+                        "Already logged in: "
+                            ++ (loggedInList
+                                    |> List.map serviceName
+                                    |> String.join ", "
+                               )
+            in
+            div [ class "footer" ]
+                [ div [ class "bottom-container" ]
+                    ([ div [ class "footer-text" ] [ text loggedInText ]
+                     , button [ onClick LogoutAll, class "logout-btn" ] [ text "Logout All?" ]
+                     ]
+                        ++ (if bothLoggedIn then
+                                [ button [ onClick GoList, class "next-btn" ] [ text "NEXT→" ] ]
+
+                            else
+                                []
+                           )
                     )
+                ]
 
-        bothLoggedIn =
-            List.member model.currentFromType loggedInList
-                && List.member model.currentToType loggedInList
+        List ->
+            div [] []
 
-        loggedInText =
-            if List.isEmpty loggedInList then
-                "まだログインしていません"
+        Done ->
+            div [ class "footer empty-footer" ] []
 
-            else
-                "Logged in: "
-                    ++ (loggedInList
-                            |> List.map serviceName
-                            |> String.join ", "
-                       )
-    in
-    div [ class "footer" ]
-        ([ text loggedInText
-         , button [ onClick LogoutAll, class "logout-btn" ] [ text "Logout All" ]
-         ]
-            ++ (if bothLoggedIn then
-                    [ button [ onClick GoList, class "next-btn" ] [ text "Next ➜" ] ]
 
-                else
-                    []
-               )
-        )
+viewDone : Model -> Html Msg
+viewDone model =
+    if model.totalTransfers == 0 then
+        div []
+            [ div [ class "done-loading-text" ]
+                [ text "プレイリストを選択してください。" ]
+            ]
+
+    else if model.transferDone then
+        div []
+            [ text "プレイリストが作成されました！" ]
+
+    else
+        div []
+            [ div [ class "loading-bar-done" ] []
+            , div [ class "done-loading-text" ] [ text "プレイリスト作成中..." ]
+            ]
 
 
 subscriptions model =

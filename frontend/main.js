@@ -6567,6 +6567,9 @@ var $author$project$Main$init = F3(
 			spotifyPlaylists: _List_Nil,
 			spotifyRaw: $elm$core$Maybe$Nothing,
 			to: $author$project$Main$serviceFromType(curTo),
+			totalTransfers: 0,
+			totalTransfersFinished: 0,
+			transferDone: false,
 			youtubePlaylists: _List_Nil
 		};
 		return _Utils_Tuple2(
@@ -6705,6 +6708,13 @@ var $elm$core$List$filter = F2(
 			_List_Nil,
 			list);
 	});
+var $elm$core$List$isEmpty = function (xs) {
+	if (!xs.b) {
+		return true;
+	} else {
+		return false;
+	}
+};
 var $elm$http$Http$jsonBody = function (value) {
 	return A2(
 		_Http_pair,
@@ -6752,7 +6762,9 @@ var $elm$http$Http$post = function (r) {
 		{body: r.body, expect: r.expect, headers: _List_Nil, method: 'POST', timeout: $elm$core$Maybe$Nothing, tracker: $elm$core$Maybe$Nothing, url: r.url});
 };
 var $elm$browser$Browser$Navigation$pushUrl = _Browser_pushUrl;
-var $author$project$Main$NoOp = {$: 'NoOp'};
+var $author$project$Main$TransferFinished = function (a) {
+	return {$: 'TransferFinished', a: a};
+};
 var $elm$json$Json$Encode$int = _Json_wrap;
 var $elm$json$Json$Encode$list = F2(
 	function (func, entries) {
@@ -6821,10 +6833,7 @@ var $author$project$Main$sendToApple = function (p) {
 							'playlist',
 							$author$project$Main$encodePlaylistItem(p))
 						]))),
-			expect: $elm$http$Http$expectWhatever(
-				function (_v0) {
-					return $author$project$Main$NoOp;
-				}),
+			expect: $elm$http$Http$expectString($author$project$Main$TransferFinished),
 			url: '/api/transfer/to/apple'
 		});
 };
@@ -6839,10 +6848,7 @@ var $author$project$Main$sendToSpotify = function (p) {
 							'playlist',
 							$author$project$Main$encodePlaylistItem(p))
 						]))),
-			expect: $elm$http$Http$expectWhatever(
-				function (_v0) {
-					return $author$project$Main$NoOp;
-				}),
+			expect: $elm$http$Http$expectString($author$project$Main$TransferFinished),
 			url: '/api/transfer/to/spotify'
 		});
 };
@@ -6857,10 +6863,7 @@ var $author$project$Main$sendToYoutube = function (p) {
 							'playlist',
 							$author$project$Main$encodePlaylistItem(p))
 						]))),
-			expect: $elm$http$Http$expectWhatever(
-				function (_v0) {
-					return $author$project$Main$NoOp;
-				}),
+			expect: $elm$http$Http$expectString($author$project$Main$TransferFinished),
 			url: '/api/transfer/to/youtube'
 		});
 };
@@ -7490,6 +7493,7 @@ var $author$project$Main$update = F2(
 							return _List_Nil;
 					}
 				}();
+				var total = $elm$core$List$length(selected);
 				var cmd = function () {
 					var _v14 = model.currentToType;
 					switch (_v14.$) {
@@ -7506,16 +7510,35 @@ var $author$project$Main$update = F2(
 							return $elm$core$Platform$Cmd$none;
 					}
 				}();
-				return _Utils_Tuple2(
+				return $elm$core$List$isEmpty(selected) ? _Utils_Tuple2(model, $elm$core$Platform$Cmd$none) : _Utils_Tuple2(
 					_Utils_update(
 						model,
-						{body: $author$project$Main$Done}),
+						{body: $author$project$Main$Done, totalTransfers: total, totalTransfersFinished: 0, transferDone: false}),
 					cmd);
+			case 'TransferFinished':
+				var result = msg.a;
+				if ((result.$ === 'Ok') && (result.a === 'ok')) {
+					var finished = model.totalTransfersFinished + 1;
+					return _Utils_eq(finished, model.totalTransfers) ? _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{totalTransfersFinished: finished, transferDone: true}),
+						$elm$core$Platform$Cmd$none) : _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{totalTransfersFinished: finished}),
+						$elm$core$Platform$Cmd$none);
+				} else {
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{transferDone: false}),
+						$elm$core$Platform$Cmd$none);
+				}
 			default:
 				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 		}
 	});
-var $author$project$Main$GoHome = {$: 'GoHome'};
 var $author$project$Main$Swap = {$: 'Swap'};
 var $elm$html$Html$button = _VirtualDom_node('button');
 var $elm$html$Html$Attributes$stringProperty = F2(
@@ -7527,6 +7550,20 @@ var $elm$html$Html$Attributes$stringProperty = F2(
 	});
 var $elm$html$Html$Attributes$class = $elm$html$Html$Attributes$stringProperty('className');
 var $elm$html$Html$div = _VirtualDom_node('div');
+var $author$project$Main$keyToServiceType = function (k) {
+	switch (k) {
+		case 'apple':
+			return $elm$core$Maybe$Just($author$project$Main$Apple);
+		case 'spotify':
+			return $elm$core$Maybe$Just($author$project$Main$Spotify);
+		case 'youtube':
+			return $elm$core$Maybe$Just($author$project$Main$Youtube);
+		case 'amazon':
+			return $elm$core$Maybe$Just($author$project$Main$Amazon);
+		default:
+			return $elm$core$Maybe$Nothing;
+	}
+};
 var $author$project$Main$NextService = {$: 'NextService'};
 var $author$project$Main$PrevService = {$: 'PrevService'};
 var $author$project$Main$SendLogin = function (a) {
@@ -7674,6 +7711,36 @@ var $author$project$Main$leftCard = F5(
 						]))
 				]));
 	});
+var $elm$core$List$any = F2(
+	function (isOkay, list) {
+		any:
+		while (true) {
+			if (!list.b) {
+				return false;
+			} else {
+				var x = list.a;
+				var xs = list.b;
+				if (isOkay(x)) {
+					return true;
+				} else {
+					var $temp$isOkay = isOkay,
+						$temp$list = xs;
+					isOkay = $temp$isOkay;
+					list = $temp$list;
+					continue any;
+				}
+			}
+		}
+	});
+var $elm$core$List$member = F2(
+	function (x, xs) {
+		return A2(
+			$elm$core$List$any,
+			function (a) {
+				return _Utils_eq(a, x);
+			},
+			xs);
+	});
 var $author$project$Main$rightCard = F3(
 	function (model, service, currentToType) {
 		var isLoggedIn = A2(
@@ -7743,6 +7810,52 @@ var $author$project$Main$rightCard = F3(
 						]))
 				]));
 	});
+var $author$project$Main$viewDone = function (model) {
+	return (!model.totalTransfers) ? A2(
+		$elm$html$Html$div,
+		_List_Nil,
+		_List_fromArray(
+			[
+				A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('done-loading-text')
+					]),
+				_List_fromArray(
+					[
+						$elm$html$Html$text('プレイリストを選択してください。')
+					]))
+			])) : (model.transferDone ? A2(
+		$elm$html$Html$div,
+		_List_Nil,
+		_List_fromArray(
+			[
+				$elm$html$Html$text('プレイリストが作成されました！')
+			])) : A2(
+		$elm$html$Html$div,
+		_List_Nil,
+		_List_fromArray(
+			[
+				A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('loading-bar-done')
+					]),
+				_List_Nil),
+				A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('done-loading-text')
+					]),
+				_List_fromArray(
+					[
+						$elm$html$Html$text('プレイリスト作成中...')
+					]))
+			])));
+};
 var $author$project$Main$ToggleAll = function (a) {
 	return {$: 'ToggleAll', a: a};
 };
@@ -7952,93 +8065,45 @@ var $author$project$Main$bodyView = function (model) {
 							]))
 					]));
 		case 'List':
-			var currentList = function () {
-				var _v1 = model.currentFromType;
-				switch (_v1.$) {
-					case 'Apple':
-						return model.applePlaylists;
-					case 'Spotify':
-						return model.spotifyPlaylists;
-					case 'Youtube':
-						return model.youtubePlaylists;
-					default:
-						return _List_Nil;
-				}
-			}();
-			return A2($author$project$Main$viewPlaylistTable, model.isLoading, currentList);
+			var loggedInList = A2(
+				$elm$core$List$filterMap,
+				function (_v2) {
+					var k = _v2.a;
+					var v = _v2.b;
+					return v ? $author$project$Main$keyToServiceType(k) : $elm$core$Maybe$Nothing;
+				},
+				$elm$core$Dict$toList(model.loginStatuses));
+			var bothLoggedIn = A2($elm$core$List$member, model.currentFromType, loggedInList) && A2($elm$core$List$member, model.currentToType, loggedInList);
+			if (bothLoggedIn) {
+				var currentList = function () {
+					var _v1 = model.currentFromType;
+					switch (_v1.$) {
+						case 'Apple':
+							return model.applePlaylists;
+						case 'Spotify':
+							return model.spotifyPlaylists;
+						case 'Youtube':
+							return model.youtubePlaylists;
+						default:
+							return _List_Nil;
+					}
+				}();
+				return A2($author$project$Main$viewPlaylistTable, model.isLoading, currentList);
+			} else {
+				return A2(
+					$elm$html$Html$div,
+					_List_Nil,
+					_List_fromArray(
+						[
+							$elm$html$Html$text('移行元と移行先のサービスにログインしてください。')
+						]));
+			}
 		default:
-			return A2(
-				$elm$html$Html$div,
-				_List_Nil,
-				_List_fromArray(
-					[
-						$elm$html$Html$text('Hello, Body3'),
-						A2(
-						$elm$html$Html$button,
-						_List_fromArray(
-							[
-								$elm$html$Html$Events$onClick($author$project$Main$GoHome)
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('Back to Body1')
-							]))
-					]));
+			return $author$project$Main$viewDone(model);
 	}
 };
 var $author$project$Main$GoList = {$: 'GoList'};
 var $author$project$Main$LogoutAll = {$: 'LogoutAll'};
-var $elm$core$List$isEmpty = function (xs) {
-	if (!xs.b) {
-		return true;
-	} else {
-		return false;
-	}
-};
-var $author$project$Main$keyToServiceType = function (k) {
-	switch (k) {
-		case 'apple':
-			return $elm$core$Maybe$Just($author$project$Main$Apple);
-		case 'spotify':
-			return $elm$core$Maybe$Just($author$project$Main$Spotify);
-		case 'youtube':
-			return $elm$core$Maybe$Just($author$project$Main$Youtube);
-		case 'amazon':
-			return $elm$core$Maybe$Just($author$project$Main$Amazon);
-		default:
-			return $elm$core$Maybe$Nothing;
-	}
-};
-var $elm$core$List$any = F2(
-	function (isOkay, list) {
-		any:
-		while (true) {
-			if (!list.b) {
-				return false;
-			} else {
-				var x = list.a;
-				var xs = list.b;
-				if (isOkay(x)) {
-					return true;
-				} else {
-					var $temp$isOkay = isOkay,
-						$temp$list = xs;
-					isOkay = $temp$isOkay;
-					list = $temp$list;
-					continue any;
-				}
-			}
-		}
-	});
-var $elm$core$List$member = F2(
-	function (x, xs) {
-		return A2(
-			$elm$core$List$any,
-			function (a) {
-				return _Utils_eq(a, x);
-			},
-			xs);
-	});
 var $author$project$Main$serviceName = function (s) {
 	switch (s.$) {
 		case 'Apple':
@@ -8052,57 +8117,90 @@ var $author$project$Main$serviceName = function (s) {
 	}
 };
 var $author$project$Main$footerView = function (model) {
-	var loggedInList = A2(
-		$elm$core$List$filterMap,
-		function (_v0) {
-			var k = _v0.a;
-			var v = _v0.b;
-			return v ? $author$project$Main$keyToServiceType(k) : $elm$core$Maybe$Nothing;
-		},
-		$elm$core$Dict$toList(model.loginStatuses));
-	var loggedInText = $elm$core$List$isEmpty(loggedInList) ? 'まだログインしていません' : ('Logged in: ' + A2(
-		$elm$core$String$join,
-		', ',
-		A2($elm$core$List$map, $author$project$Main$serviceName, loggedInList)));
-	var bothLoggedIn = A2($elm$core$List$member, model.currentFromType, loggedInList) && A2($elm$core$List$member, model.currentToType, loggedInList);
-	return A2(
-		$elm$html$Html$div,
-		_List_fromArray(
-			[
-				$elm$html$Html$Attributes$class('footer')
-			]),
-		_Utils_ap(
-			_List_fromArray(
-				[
-					$elm$html$Html$text(loggedInText),
-					A2(
-					$elm$html$Html$button,
-					_List_fromArray(
-						[
-							$elm$html$Html$Events$onClick($author$project$Main$LogoutAll),
-							$elm$html$Html$Attributes$class('logout-btn')
-						]),
-					_List_fromArray(
-						[
-							$elm$html$Html$text('Logout All')
-						]))
-				]),
-			bothLoggedIn ? _List_fromArray(
-				[
-					A2(
-					$elm$html$Html$button,
-					_List_fromArray(
-						[
-							$elm$html$Html$Events$onClick($author$project$Main$GoList),
-							$elm$html$Html$Attributes$class('next-btn')
-						]),
-					_List_fromArray(
-						[
-							$elm$html$Html$text('Next ➜')
-						]))
-				]) : _List_Nil));
+	var _v0 = model.body;
+	switch (_v0.$) {
+		case 'Home':
+			var loggedInList = A2(
+				$elm$core$List$filterMap,
+				function (_v1) {
+					var k = _v1.a;
+					var v = _v1.b;
+					return v ? $author$project$Main$keyToServiceType(k) : $elm$core$Maybe$Nothing;
+				},
+				$elm$core$Dict$toList(model.loginStatuses));
+			var loggedInText = $elm$core$List$isEmpty(loggedInList) ? 'まだログインしていません' : ('Already logged in: ' + A2(
+				$elm$core$String$join,
+				', ',
+				A2($elm$core$List$map, $author$project$Main$serviceName, loggedInList)));
+			var bothLoggedIn = A2($elm$core$List$member, model.currentFromType, loggedInList) && A2($elm$core$List$member, model.currentToType, loggedInList);
+			return A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('footer')
+					]),
+				_List_fromArray(
+					[
+						A2(
+						$elm$html$Html$div,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('bottom-container')
+							]),
+						_Utils_ap(
+							_List_fromArray(
+								[
+									A2(
+									$elm$html$Html$div,
+									_List_fromArray(
+										[
+											$elm$html$Html$Attributes$class('footer-text')
+										]),
+									_List_fromArray(
+										[
+											$elm$html$Html$text(loggedInText)
+										])),
+									A2(
+									$elm$html$Html$button,
+									_List_fromArray(
+										[
+											$elm$html$Html$Events$onClick($author$project$Main$LogoutAll),
+											$elm$html$Html$Attributes$class('logout-btn')
+										]),
+									_List_fromArray(
+										[
+											$elm$html$Html$text('Logout All?')
+										]))
+								]),
+							bothLoggedIn ? _List_fromArray(
+								[
+									A2(
+									$elm$html$Html$button,
+									_List_fromArray(
+										[
+											$elm$html$Html$Events$onClick($author$project$Main$GoList),
+											$elm$html$Html$Attributes$class('next-btn')
+										]),
+									_List_fromArray(
+										[
+											$elm$html$Html$text('NEXT→')
+										]))
+								]) : _List_Nil))
+					]));
+		case 'List':
+			return A2($elm$html$Html$div, _List_Nil, _List_Nil);
+		default:
+			return A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('footer empty-footer')
+					]),
+				_List_Nil);
+	}
 };
 var $author$project$Main$GoDone = {$: 'GoDone'};
+var $author$project$Main$GoHome = {$: 'GoHome'};
 var $author$project$Main$navLink = F3(
 	function (label, msg, active) {
 		return active ? A2(

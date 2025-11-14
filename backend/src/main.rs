@@ -1009,7 +1009,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), secret_key.clone())
                     .cookie_name("replaylist.sid".into())
-                    .cookie_secure(false)
+                    .cookie_secure(true)
                     .cookie_same_site(SameSite::None)
                     .cookie_http_only(true)
                     .build(),
