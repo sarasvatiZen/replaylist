@@ -12,6 +12,39 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[post("/api/donate")]
+async fn donate() -> impl Responder {
+    let secret = std::env::var("STRIPE_SECRET_KEY").unwrap();
+
+    let params = [
+        ("mode", "payment"),
+        ("success_url", "https://your-ngrok-url/done"),
+        ("cancel_url", "https://your-ngrok-url/done"),
+        ("line_items[0][price_data][currency]", "jpy"),
+        ("line_items[0][price_data][product_data][name]", "Donation"),
+        ("line_items[0][price_data][unit_amount]", "100"),
+        ("line_items[0][quantity]", "1"),
+    ];
+
+    let client = reqwest::Client::new();
+
+    let resp = client
+        .post("https://api.stripe.com/v1/checkout/sessions")
+        .basic_auth(secret, Some(""))
+        .form(&params)
+        .send()
+        .await;
+
+    match resp {
+        Ok(response) => {
+            let body: serde_json::Value = response.json().await.unwrap();
+            let url = body["url"].as_str().unwrap_or("").to_string();
+            HttpResponse::Ok().body(url)
+        }
+        Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
+    }
+}
+
 #[derive(Deserialize)]
 struct TransferPayload {
     playlist: PlaylistItem,
@@ -1032,6 +1065,7 @@ async fn main() -> std::io::Result<()> {
             .service(transfer_to_apple)
             .service(transfer_to_youtube)
             .service(save_apple_user_token)
+            .service(donate)
             .service(Files::new("/", "../frontend").index_file("index.html"))
     })
     .bind(bind_addr)?

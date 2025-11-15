@@ -3,9 +3,9 @@ port module Main exposing (main)
 import Browser
 import Browser.Navigation
 import Dict exposing (Dict)
-import Html exposing (Html, button, div, img, input, span, text)
-import Html.Attributes exposing (checked, class, src, type_)
-import Html.Events exposing (onCheck, onClick)
+import Html exposing (Html, a, button, div, img, input, span, text)
+import Html.Attributes exposing (checked, class, href, placeholder, rel, src, target, type_)
+import Html.Events exposing (onCheck, onClick, onInput)
 import Http
 import Json.Decode as D
 import Json.Encode as E
@@ -76,6 +76,10 @@ type alias Model =
     , totalTransfers : Int
     , totalTransfersFinished : Int
     , transferDone : Bool
+    , currency : Currency
+    , selectedAmount : Maybe Int
+    , customAmount : String
+    , donationAmount : Int
     }
 
 
@@ -110,6 +114,11 @@ type Msg
     | AppleLoginAgain
     | TransferSelected
     | TransferFinished (Result Http.Error String)
+    | SelectCurrency Currency
+    | SelectAmount Int
+    | UpdateCustomAmount String
+    | DonateClick
+    | DonateResponse (Result Http.Error String)
     | NoOp
 
 
@@ -216,6 +225,10 @@ init _ url key =
             , totalTransfers = 0
             , totalTransfersFinished = 0
             , transferDone = False
+            , currency = JPY
+            , selectedAmount = Just 100
+            , customAmount = ""
+            , donationAmount = 100
             }
     in
     ( model
@@ -811,6 +824,34 @@ update msg model =
                 _ ->
                     ( { model | transferDone = False }, Cmd.none )
 
+        SelectCurrency cur ->
+            ( { model | currency = cur }, Cmd.none )
+
+        SelectAmount amount ->
+            ( { model | selectedAmount = Just amount, donationAmount = amount }, Cmd.none )
+
+        UpdateCustomAmount str ->
+            let
+                parsed =
+                    String.toInt str |> Maybe.withDefault 0
+            in
+            ( { model
+                | customAmount = str
+                , selectedAmount = Nothing
+                , donationAmount = parsed
+              }
+            , Cmd.none
+            )
+
+        DonateClick ->
+            ( model, donateRequest )
+
+        DonateResponse (Ok url) ->
+            ( model, Browser.Navigation.load url )
+
+        DonateResponse (Err _) ->
+            ( model, Cmd.none )
+
         NoOp ->
             ( model, Cmd.none )
 
@@ -1018,10 +1059,27 @@ bodyView model =
 
             else
                 div []
-                    [ text "移行元と移行先のサービスにログインしてください。" ]
+                    [ text "Log in to both services to continue" ]
 
         Done ->
-            viewDone model
+            if model.totalTransfers == 0 then
+                div [ class "done-container" ]
+                    [ div [ class "done-loading-text" ]
+                        [ text "Select playlists" ]
+                    ]
+
+            else if model.transferDone then
+                div [ class "done-container" ]
+                    [ div [ class "done-message" ]
+                        [ text "Migration done!" ]
+                    ]
+
+            else
+                div [ class "done-loading-container" ]
+                    [ div [ class "loading-bar-done" ] []
+                    , div [ class "done-loading-text" ]
+                        [ text "Playlists migration in progress…" ]
+                    ]
 
 
 headerRow : Bool -> Html Msg
@@ -1138,7 +1196,7 @@ footerView model =
 
                 loggedInText =
                     if List.isEmpty loggedInList then
-                        "まだログインしていません"
+                        "Not Logged in any service yet"
 
                     else
                         "Already logged in: "
@@ -1165,26 +1223,79 @@ footerView model =
             div [] []
 
         Done ->
-            div [ class "footer empty-footer" ] []
+            div [ class "donation-card" ]
+                [ currencySlider model
+                , div [ class "donation-presets" ]
+                    [ button [ class "donation-btn", onClick (SelectAmount 100) ] [ text "¥100" ]
+                    , button [ class "donation-btn", onClick (SelectAmount 500) ] [ text "¥500" ]
+                    , button [ class "donation-btn", onClick (SelectAmount 1000) ] [ text "¥1000" ]
+                    ]
+                , div [ class "donation-custom" ]
+                    [ input
+                        [ class "custom-input"
+                        , type_ "number"
+                        , placeholder "¥ (custom)"
+                        , onInput UpdateCustomAmount
+                        ]
+                        []
+                    ]
+                , button
+                    [ class "donate-btn"
+                    , onClick DonateClick
+                    ]
+                    [ text "☕️Donate with Link☕️" ]
+                ]
 
 
-viewDone : Model -> Html Msg
-viewDone model =
-    if model.totalTransfers == 0 then
-        div []
-            [ div [ class "done-loading-text" ]
-                [ text "プレイリストを選択してください。" ]
+currencySlider : Model -> Html Msg
+currencySlider model =
+    let
+        pos =
+            case model.currency of
+                USD ->
+                    0
+
+                JPY ->
+                    1
+
+                EUR ->
+                    2
+
+        translate =
+            "translateX(" ++ String.fromInt (pos * 100) ++ "%)"
+
+        optClass currency =
+            if currency == model.currency then
+                "slider-option active"
+
+            else
+                "slider-option"
+    in
+    div [ class "currency-slider" ]
+        [ div
+            [ class "slider-thumb"
+            , Html.Attributes.style "transform" translate
             ]
+            []
+        , div [ class (optClass USD), onClick (SelectCurrency USD) ] [ text "USD" ]
+        , div [ class (optClass JPY), onClick (SelectCurrency JPY) ] [ text "JPY" ]
+        , div [ class (optClass EUR), onClick (SelectCurrency EUR) ] [ text "EUR" ]
+        ]
 
-    else if model.transferDone then
-        div []
-            [ text "プレイリストが作成されました！" ]
 
-    else
-        div []
-            [ div [ class "loading-bar-done" ] []
-            , div [ class "done-loading-text" ] [ text "プレイリスト作成中..." ]
-            ]
+type Currency
+    = USD
+    | JPY
+    | EUR
+
+
+donateRequest : Cmd Msg
+donateRequest =
+    Http.post
+        { url = "/api/donate"
+        , body = Http.emptyBody
+        , expect = Http.expectString DonateResponse
+        }
 
 
 subscriptions model =
