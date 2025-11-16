@@ -381,20 +381,6 @@ body {
     border-radius: 22px;
     min-width: 260px;
     text-align: center;
-
-    backdrop-filter: blur(10px);
-    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4);
-
-    transition:
-        transform 0.25s ease,
-        box-shadow 0.25s ease,
-        background 0.25s ease;
-}
-
-.next-btn:hover {
-    margin-top: 10px;
-    transform: translateY(-2px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
 }
 
 .loading-bar-done {

@@ -1223,28 +1223,21 @@ footerView model =
             div [] []
 
         Done ->
-            div [ class "donation-card" ]
-                [ currencySlider model
-                , div [ class "donation-presets" ]
-                    [ button [ class "donation-btn", onClick (SelectAmount 100) ] [ text "¥100" ]
-                    , button [ class "donation-btn", onClick (SelectAmount 500) ] [ text "¥500" ]
-                    , button [ class "donation-btn", onClick (SelectAmount 1000) ] [ text "¥1000" ]
-                    ]
-                , div [ class "donation-custom" ]
-                    [ input
-                        [ class "custom-input"
-                        , type_ "number"
-                        , placeholder "¥ (custom)"
-                        , onInput UpdateCustomAmount
-                        ]
-                        []
-                    ]
-                , button
-                    [ class "donate-btn"
-                    , onClick DonateClick
-                    ]
-                    [ text "☕️Donate with Link☕️" ]
-                ]
+            case model.currency of
+                USD ->
+                    donationUsd model
+
+                JPY ->
+                    donationJpy model
+
+                EUR ->
+                    donationEur model
+
+
+type Currency
+    = USD
+    | JPY
+    | EUR
 
 
 currencySlider : Model -> Html Msg
@@ -1283,10 +1276,73 @@ currencySlider model =
         ]
 
 
-type Currency
-    = USD
-    | JPY
-    | EUR
+donationJpy : Model -> Html Msg
+donationJpy model =
+    div [ class "donation-card" ]
+        [ currencySlider model
+        , div [ class "donation-presets" ]
+            [ button [ class "donation-btn", onClick (SelectAmount 100) ] [ text "¥100" ]
+            , button [ class "donation-btn", onClick (SelectAmount 500) ] [ text "¥500" ]
+            , button [ class "donation-btn", onClick (SelectAmount 1000) ] [ text "¥1000" ]
+            ]
+        , div [ class "donation-custom" ]
+            [ input
+                [ class "custom-input"
+                , type_ "number"
+                , placeholder "¥ (custom)"
+                , onInput UpdateCustomAmount
+                ]
+                []
+            ]
+        , button [ class "donate-btn", onClick DonateClick ]
+            [ text "☕️Donate via Link☕️" ]
+        ]
+
+
+donationUsd : Model -> Html Msg
+donationUsd model =
+    div [ class "donation-card" ]
+        [ currencySlider model
+        , div [ class "donation-presets" ]
+            [ button [ class "donation-btn", onClick (SelectAmount 1) ] [ text "$1" ]
+            , button [ class "donation-btn", onClick (SelectAmount 5) ] [ text "$5" ]
+            , button [ class "donation-btn", onClick (SelectAmount 10) ] [ text "$10" ]
+            ]
+        , div [ class "donation-custom" ]
+            [ input
+                [ class "custom-input"
+                , type_ "number"
+                , placeholder "$ (custom)"
+                , onInput UpdateCustomAmount
+                ]
+                []
+            ]
+        , button [ class "donate-btn", onClick DonateClick ]
+            [ text "☕️Donate via Link☕️" ]
+        ]
+
+
+donationEur : Model -> Html Msg
+donationEur model =
+    div [ class "donation-card" ]
+        [ currencySlider model
+        , div [ class "donation-presets" ]
+            [ button [ class "donation-btn", onClick (SelectAmount 1) ] [ text "€1" ]
+            , button [ class "donation-btn", onClick (SelectAmount 5) ] [ text "€5" ]
+            , button [ class "donation-btn", onClick (SelectAmount 10) ] [ text "€10" ]
+            ]
+        , div [ class "donation-custom" ]
+            [ input
+                [ class "custom-input"
+                , type_ "number"
+                , placeholder "€ (custom)"
+                , onInput UpdateCustomAmount
+                ]
+                []
+            ]
+        , button [ class "donate-btn", onClick DonateClick ]
+            [ text "☕️Donate via Link☕️" ]
+        ]
 
 
 donateRequest : Cmd Msg

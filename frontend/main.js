@@ -8170,9 +8170,9 @@ var $author$project$Main$bodyView = function (model) {
 					])));
 	}
 };
-var $author$project$Main$DonateClick = {$: 'DonateClick'};
 var $author$project$Main$GoList = {$: 'GoList'};
 var $author$project$Main$LogoutAll = {$: 'LogoutAll'};
+var $author$project$Main$DonateClick = {$: 'DonateClick'};
 var $author$project$Main$SelectAmount = function (a) {
 	return {$: 'SelectAmount', a: a};
 };
@@ -8287,6 +8287,267 @@ var $elm$html$Html$Events$onInput = function (tagger) {
 			A2($elm$json$Json$Decode$map, tagger, $elm$html$Html$Events$targetValue)));
 };
 var $elm$html$Html$Attributes$placeholder = $elm$html$Html$Attributes$stringProperty('placeholder');
+var $author$project$Main$donationEur = function (model) {
+	return A2(
+		$elm$html$Html$div,
+		_List_fromArray(
+			[
+				$elm$html$Html$Attributes$class('donation-card')
+			]),
+		_List_fromArray(
+			[
+				$author$project$Main$currencySlider(model),
+				A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('donation-presets')
+					]),
+				_List_fromArray(
+					[
+						A2(
+						$elm$html$Html$button,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Events$onClick(
+								$author$project$Main$SelectAmount(1))
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('€1')
+							])),
+						A2(
+						$elm$html$Html$button,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Events$onClick(
+								$author$project$Main$SelectAmount(5))
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('€5')
+							])),
+						A2(
+						$elm$html$Html$button,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Events$onClick(
+								$author$project$Main$SelectAmount(10))
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('€10')
+							]))
+					])),
+				A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('donation-custom')
+					]),
+				_List_fromArray(
+					[
+						A2(
+						$elm$html$Html$input,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('custom-input'),
+								$elm$html$Html$Attributes$type_('number'),
+								$elm$html$Html$Attributes$placeholder('€ (custom)'),
+								$elm$html$Html$Events$onInput($author$project$Main$UpdateCustomAmount)
+							]),
+						_List_Nil)
+					])),
+				A2(
+				$elm$html$Html$button,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('donate-btn'),
+						$elm$html$Html$Events$onClick($author$project$Main$DonateClick)
+					]),
+				_List_fromArray(
+					[
+						$elm$html$Html$text('☕️Donate via Link☕️')
+					]))
+			]));
+};
+var $author$project$Main$donationJpy = function (model) {
+	return A2(
+		$elm$html$Html$div,
+		_List_fromArray(
+			[
+				$elm$html$Html$Attributes$class('donation-card')
+			]),
+		_List_fromArray(
+			[
+				$author$project$Main$currencySlider(model),
+				A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('donation-presets')
+					]),
+				_List_fromArray(
+					[
+						A2(
+						$elm$html$Html$button,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Events$onClick(
+								$author$project$Main$SelectAmount(100))
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('¥100')
+							])),
+						A2(
+						$elm$html$Html$button,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Events$onClick(
+								$author$project$Main$SelectAmount(500))
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('¥500')
+							])),
+						A2(
+						$elm$html$Html$button,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Events$onClick(
+								$author$project$Main$SelectAmount(1000))
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('¥1000')
+							]))
+					])),
+				A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('donation-custom')
+					]),
+				_List_fromArray(
+					[
+						A2(
+						$elm$html$Html$input,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('custom-input'),
+								$elm$html$Html$Attributes$type_('number'),
+								$elm$html$Html$Attributes$placeholder('¥ (custom)'),
+								$elm$html$Html$Events$onInput($author$project$Main$UpdateCustomAmount)
+							]),
+						_List_Nil)
+					])),
+				A2(
+				$elm$html$Html$button,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('donate-btn'),
+						$elm$html$Html$Events$onClick($author$project$Main$DonateClick)
+					]),
+				_List_fromArray(
+					[
+						$elm$html$Html$text('☕️Donate via Link☕️')
+					]))
+			]));
+};
+var $author$project$Main$donationUsd = function (model) {
+	return A2(
+		$elm$html$Html$div,
+		_List_fromArray(
+			[
+				$elm$html$Html$Attributes$class('donation-card')
+			]),
+		_List_fromArray(
+			[
+				$author$project$Main$currencySlider(model),
+				A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('donation-presets')
+					]),
+				_List_fromArray(
+					[
+						A2(
+						$elm$html$Html$button,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Events$onClick(
+								$author$project$Main$SelectAmount(1))
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('$1')
+							])),
+						A2(
+						$elm$html$Html$button,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Events$onClick(
+								$author$project$Main$SelectAmount(5))
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('$5')
+							])),
+						A2(
+						$elm$html$Html$button,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Events$onClick(
+								$author$project$Main$SelectAmount(10))
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('$10')
+							]))
+					])),
+				A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('donation-custom')
+					]),
+				_List_fromArray(
+					[
+						A2(
+						$elm$html$Html$input,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('custom-input'),
+								$elm$html$Html$Attributes$type_('number'),
+								$elm$html$Html$Attributes$placeholder('$ (custom)'),
+								$elm$html$Html$Events$onInput($author$project$Main$UpdateCustomAmount)
+							]),
+						_List_Nil)
+					])),
+				A2(
+				$elm$html$Html$button,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('donate-btn'),
+						$elm$html$Html$Events$onClick($author$project$Main$DonateClick)
+					]),
+				_List_fromArray(
+					[
+						$elm$html$Html$text('☕️Donate via Link☕️')
+					]))
+			]));
+};
 var $author$project$Main$serviceName = function (s) {
 	switch (s.$) {
 		case 'Apple':
@@ -8373,91 +8634,15 @@ var $author$project$Main$footerView = function (model) {
 		case 'List':
 			return A2($elm$html$Html$div, _List_Nil, _List_Nil);
 		default:
-			return A2(
-				$elm$html$Html$div,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class('donation-card')
-					]),
-				_List_fromArray(
-					[
-						$author$project$Main$currencySlider(model),
-						A2(
-						$elm$html$Html$div,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class('donation-presets')
-							]),
-						_List_fromArray(
-							[
-								A2(
-								$elm$html$Html$button,
-								_List_fromArray(
-									[
-										$elm$html$Html$Attributes$class('donation-btn'),
-										$elm$html$Html$Events$onClick(
-										$author$project$Main$SelectAmount(100))
-									]),
-								_List_fromArray(
-									[
-										$elm$html$Html$text('¥100')
-									])),
-								A2(
-								$elm$html$Html$button,
-								_List_fromArray(
-									[
-										$elm$html$Html$Attributes$class('donation-btn'),
-										$elm$html$Html$Events$onClick(
-										$author$project$Main$SelectAmount(500))
-									]),
-								_List_fromArray(
-									[
-										$elm$html$Html$text('¥500')
-									])),
-								A2(
-								$elm$html$Html$button,
-								_List_fromArray(
-									[
-										$elm$html$Html$Attributes$class('donation-btn'),
-										$elm$html$Html$Events$onClick(
-										$author$project$Main$SelectAmount(1000))
-									]),
-								_List_fromArray(
-									[
-										$elm$html$Html$text('¥1000')
-									]))
-							])),
-						A2(
-						$elm$html$Html$div,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class('donation-custom')
-							]),
-						_List_fromArray(
-							[
-								A2(
-								$elm$html$Html$input,
-								_List_fromArray(
-									[
-										$elm$html$Html$Attributes$class('custom-input'),
-										$elm$html$Html$Attributes$type_('number'),
-										$elm$html$Html$Attributes$placeholder('¥ (custom)'),
-										$elm$html$Html$Events$onInput($author$project$Main$UpdateCustomAmount)
-									]),
-								_List_Nil)
-							])),
-						A2(
-						$elm$html$Html$button,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class('donate-btn'),
-								$elm$html$Html$Events$onClick($author$project$Main$DonateClick)
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('☕️Donate with Link☕️')
-							]))
-					]));
+			var _v2 = model.currency;
+			switch (_v2.$) {
+				case 'USD':
+					return $author$project$Main$donationUsd(model);
+				case 'JPY':
+					return $author$project$Main$donationJpy(model);
+				default:
+					return $author$project$Main$donationEur(model);
+			}
 	}
 };
 var $author$project$Main$GoDone = {$: 'GoDone'};
