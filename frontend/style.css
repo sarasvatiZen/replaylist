@@ -37,6 +37,21 @@ body {
     letter-spacing: 1px;
 }
 
+.header-title-link {
+    color: white;
+    text-decoration: none;
+    font-family: "Montserrat", sans-serif;
+    font-weight: 600;
+    font-size: 34px;
+    letter-spacing: 1px;
+    cursor: pointer;
+}
+
+.header-title-link:hover {
+    color: white;
+    text-decoration: none;
+}
+
 .nav {
     background: transparent;
     border: 0;
@@ -465,6 +480,11 @@ body {
     cursor: pointer;
 }
 
+.donation-btn.active {
+    background: #0074d4;
+    color: white;
+}
+
 .donation-custom {
     width: 100%;
 }
@@ -487,8 +507,8 @@ body {
     font-size: 18px;
     font-weight: 700;
     cursor: pointer;
-    background: #2ee071;
-    color: #111111;
+    background: #525f7f;
+    color: white;
 }
 
 .currency-slider {
@@ -525,4 +545,36 @@ body {
     border-radius: 30px;
     transition: transform 0.25s ease;
     z-index: 1;
+}
+
+.about-container {
+    max-width: 720px;
+    margin: 40px auto;
+    padding: 32px 36px;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 28px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+    color: #f0f0f0;
+    line-height: 1.7;
+    font-size: 16px;
+}
+
+.about-title {
+    font-size: 22px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 28px;
+    color: #ffffff;
+    letter-spacing: 0.03em;
+}
+
+.about-section {
+    margin-bottom: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px 14px;
+    border-radius: 12px;
+    border-left: 4px solid #4da3ff;
+
+.about-section:last-child {
+    margin-bottom: 0;
 }

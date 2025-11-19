@@ -1,10 +1,10 @@
 use actix_files::Files;
-use actix_session::{Session, SessionMiddleware, storage::CookieSessionStore};
+use actix_session::{storage::CookieSessionStore, Session, SessionMiddleware};
 use actix_web::cookie::{Key, SameSite};
-use actix_web::{App, HttpResponse, HttpServer, Responder, get, post, route, web};
-use base64::{Engine as _, engine::general_purpose};
+use actix_web::{get, post, route, web, App, HttpResponse, HttpServer, Responder};
+use base64::{engine::general_purpose, Engine as _};
 use dotenv::dotenv;
-use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
+use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -12,17 +12,29 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[derive(Deserialize)]
+struct DonatePayload {
+    amount: i64,
+    currency: String,
+}
+
 #[post("/api/donate")]
-async fn donate() -> impl Responder {
+async fn donate(body: web::Json<DonatePayload>) -> impl Responder {
     let secret = std::env::var("STRIPE_SECRET_KEY").unwrap();
 
     let params = [
         ("mode", "payment"),
-        ("success_url", "https://your-ngrok-url/done"),
-        ("cancel_url", "https://your-ngrok-url/done"),
-        ("line_items[0][price_data][currency]", "jpy"),
+        ("success_url", "https://replaylist.online"),
+        ("cancel_url", "https://replaylist.online"),
+        (
+            "line_items[0][price_data][currency]",
+            body.currency.as_str(),
+        ),
         ("line_items[0][price_data][product_data][name]", "Donation"),
-        ("line_items[0][price_data][unit_amount]", "100"),
+        (
+            "line_items[0][price_data][unit_amount]",
+            &body.amount.to_string(),
+        ),
         ("line_items[0][quantity]", "1"),
     ];
 
@@ -36,12 +48,12 @@ async fn donate() -> impl Responder {
         .await;
 
     match resp {
-        Ok(response) => {
-            let body: serde_json::Value = response.json().await.unwrap();
-            let url = body["url"].as_str().unwrap_or("").to_string();
-            HttpResponse::Ok().body(url)
+        Ok(r) => {
+            let json: serde_json::Value = r.json().await.unwrap();
+            let url = json["url"].as_str().unwrap_or("").to_string();
+            HttpResponse::Ok().json(serde_json::json!({ "url": url }))
         }
-        Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
+        Err(e) => HttpResponse::InternalServerError().body(format!("stripe error: {}", e)),
     }
 }
 

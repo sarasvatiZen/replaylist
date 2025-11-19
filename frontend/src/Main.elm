@@ -3,7 +3,7 @@ port module Main exposing (main)
 import Browser
 import Browser.Navigation
 import Dict exposing (Dict)
-import Html exposing (Html, a, button, div, img, input, span, text)
+import Html exposing (Html, button, div, img, input, span, text)
 import Html.Attributes exposing (checked, class, href, placeholder, rel, src, target, type_)
 import Html.Events exposing (onCheck, onClick, onInput)
 import Http
@@ -87,6 +87,7 @@ type Body
     = Home
     | List
     | Done
+    | About
 
 
 type Msg
@@ -96,6 +97,7 @@ type Msg
     | GoHome
     | GoList
     | GoDone
+    | GoAbout
     | Swap
     | NextService
     | PrevService
@@ -408,7 +410,7 @@ loginCmd serviceType model =
                 ("https://accounts.spotify.com/authorize"
                     ++ "?client_id=a0e8851f25054913bffdfec463b47679"
                     ++ "&response_type=code"
-                    ++ "&redirect_uri=https://replaylist.ngrok.io/api/login/spotify/callback"
+                    ++ "&redirect_uri=https://replaylist.online/api/login/spotify/callback"
                     ++ "&scope=playlist-read-private+playlist-modify-private"
                     ++ "&state="
                     ++ encodedState
@@ -421,7 +423,7 @@ loginCmd serviceType model =
                     ++ "&client_id="
                     ++ Url.percentEncode "263472270217-7ndt9q7oe9qm0r0dc01jaqu7p712a02h.apps.googleusercontent.com"
                     ++ "&redirect_uri="
-                    ++ Url.percentEncode "https://replaylist.ngrok.io/api/login/youtube/callback"
+                    ++ Url.percentEncode "https://replaylist.online/api/login/youtube/callback"
                     ++ "&scope="
                     ++ Url.percentEncode "https://www.googleapis.com/auth/youtube.readonly"
                     ++ "&access_type=offline&include_granted_scopes=true&prompt=consent"
@@ -656,6 +658,9 @@ update msg model =
         GoDone ->
             ( { model | body = Done }, Cmd.none )
 
+        GoAbout ->
+            ( { model | body = About }, Cmd.none )
+
         LogoutAll ->
             ( { model | loginStatuses = Dict.empty }
             , Http.post
@@ -825,7 +830,25 @@ update msg model =
                     ( { model | transferDone = False }, Cmd.none )
 
         SelectCurrency cur ->
-            ( { model | currency = cur }, Cmd.none )
+            let
+                defaultAmount =
+                    case cur of
+                        JPY ->
+                            100
+
+                        USD ->
+                            1
+
+                        EUR ->
+                            1
+            in
+            ( { model
+                | currency = cur
+                , selectedAmount = Just defaultAmount
+                , donationAmount = defaultAmount
+              }
+            , Cmd.none
+            )
 
         SelectAmount amount ->
             ( { model | selectedAmount = Just amount, donationAmount = amount }, Cmd.none )
@@ -844,7 +867,7 @@ update msg model =
             )
 
         DonateClick ->
-            ( model, donateRequest )
+            ( model, donateRequest model )
 
         DonateResponse (Ok url) ->
             ( model, Browser.Navigation.load url )
@@ -874,7 +897,7 @@ serviceFromType sType =
         Amazon ->
             { name = "AmazonMusic"
             , icon = "assets/AmazonIcon.png"
-            , loginLabel = "Login with AmazonMusic"
+            , loginLabel = "Not Yet"
             }
 
         Spotify ->
@@ -942,6 +965,9 @@ parseBody url =
         "/done" ->
             Done
 
+        "/about" ->
+            About
+
         _ ->
             Home
 
@@ -995,6 +1021,8 @@ header model =
             , navLink "list" GoList (model.body == List)
             , text " | "
             , navLink "done" GoDone (model.body == Done)
+            , text " | "
+            , navLink "about" GoAbout (model.body == About)
             ]
         ]
 
@@ -1080,6 +1108,23 @@ bodyView model =
                     , div [ class "done-loading-text" ]
                         [ text "Playlists migration in progress…" ]
                     ]
+
+        About ->
+            div [ class "about-container" ]
+                [ div [ class "about-title" ] [ text "Operator Information / Legal Notice" ]
+                , div [ class "about-section" ]
+                    [ text "● Operator Name: KAZUHISA NOGUCHI" ]
+                , div [ class "about-section" ]
+                    [ text "● Address: Kuji City, Iwate Prefecture, Japan" ]
+                , div [ class "about-section" ]
+                    [ text "● Contact Email: sarasvatizen@duck.com" ]
+                , div [ class "about-section" ]
+                    [ text "● Pricing: Voluntary donations (from ¥100 / $1 / €1)" ]
+                , div [ class "about-section" ]
+                    [ text "● Delivery of Goods: Not applicable (donation-based, no physical goods or services provided)" ]
+                , div [ class "about-section" ]
+                    [ text "● Refund Policy: Donations are non-refundable due to their voluntary nature" ]
+                ]
 
 
 headerRow : Bool -> Html Msg
@@ -1233,6 +1278,9 @@ footerView model =
                 EUR ->
                     donationEur model
 
+        About ->
+            div [] []
+
 
 type Currency
     = USD
@@ -1281,9 +1329,21 @@ donationJpy model =
     div [ class "donation-card" ]
         [ currencySlider model
         , div [ class "donation-presets" ]
-            [ button [ class "donation-btn", onClick (SelectAmount 100) ] [ text "¥100" ]
-            , button [ class "donation-btn", onClick (SelectAmount 500) ] [ text "¥500" ]
-            , button [ class "donation-btn", onClick (SelectAmount 1000) ] [ text "¥1000" ]
+            [ button
+                [ class (presetClass model 100)
+                , onClick (SelectAmount 100)
+                ]
+                [ text "¥100" ]
+            , button
+                [ class (presetClass model 500)
+                , onClick (SelectAmount 500)
+                ]
+                [ text "¥500" ]
+            , button
+                [ class (presetClass model 1000)
+                , onClick (SelectAmount 1000)
+                ]
+                [ text "¥1000" ]
             ]
         , div [ class "donation-custom" ]
             [ input
@@ -1295,7 +1355,7 @@ donationJpy model =
                 []
             ]
         , button [ class "donate-btn", onClick DonateClick ]
-            [ text "☕️Donate via Link☕️" ]
+            [ text "Donate via Stripe-Link" ]
         ]
 
 
@@ -1304,9 +1364,21 @@ donationUsd model =
     div [ class "donation-card" ]
         [ currencySlider model
         , div [ class "donation-presets" ]
-            [ button [ class "donation-btn", onClick (SelectAmount 1) ] [ text "$1" ]
-            , button [ class "donation-btn", onClick (SelectAmount 5) ] [ text "$5" ]
-            , button [ class "donation-btn", onClick (SelectAmount 10) ] [ text "$10" ]
+            [ button
+                [ class (presetClass model 1)
+                , onClick (SelectAmount 1)
+                ]
+                [ text "$1" ]
+            , button
+                [ class (presetClass model 5)
+                , onClick (SelectAmount 5)
+                ]
+                [ text "$5" ]
+            , button
+                [ class (presetClass model 10)
+                , onClick (SelectAmount 10)
+                ]
+                [ text "$10" ]
             ]
         , div [ class "donation-custom" ]
             [ input
@@ -1327,9 +1399,21 @@ donationEur model =
     div [ class "donation-card" ]
         [ currencySlider model
         , div [ class "donation-presets" ]
-            [ button [ class "donation-btn", onClick (SelectAmount 1) ] [ text "€1" ]
-            , button [ class "donation-btn", onClick (SelectAmount 5) ] [ text "€5" ]
-            , button [ class "donation-btn", onClick (SelectAmount 10) ] [ text "€10" ]
+            [ button
+                [ class (presetClass model 1)
+                , onClick (SelectAmount 1)
+                ]
+                [ text "€1" ]
+            , button
+                [ class (presetClass model 5)
+                , onClick (SelectAmount 5)
+                ]
+                [ text "€5" ]
+            , button
+                [ class (presetClass model 10)
+                , onClick (SelectAmount 10)
+                ]
+                [ text "€10" ]
             ]
         , div [ class "donation-custom" ]
             [ input
@@ -1345,13 +1429,42 @@ donationEur model =
         ]
 
 
-donateRequest : Cmd Msg
-donateRequest =
+presetClass : Model -> Int -> String
+presetClass model val =
+    if model.selectedAmount == Just val then
+        "donation-btn active"
+
+    else
+        "donation-btn"
+
+
+donateRequest : Model -> Cmd Msg
+donateRequest model =
     Http.post
         { url = "/api/donate"
-        , body = Http.emptyBody
-        , expect = Http.expectString DonateResponse
+        , body =
+            Http.jsonBody <|
+                E.object
+                    [ ( "amount", E.int model.donationAmount )
+                    , ( "currency"
+                      , case model.currency of
+                            USD ->
+                                E.string "usd"
+
+                            JPY ->
+                                E.string "jpy"
+
+                            EUR ->
+                                E.string "eur"
+                      )
+                    ]
+        , expect = Http.expectJson DonateResponse donateDecoder
         }
+
+
+donateDecoder : D.Decoder String
+donateDecoder =
+    D.field "url" D.string
 
 
 subscriptions model =

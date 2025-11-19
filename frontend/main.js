@@ -6532,7 +6532,7 @@ var $author$project$Main$serviceFromType = function (sType) {
 		case 'Youtube':
 			return {icon: 'assets/YouTubeIcon.png', loginLabel: 'Login with YouTube', name: 'YouTubeMusic'};
 		case 'Amazon':
-			return {icon: 'assets/AmazonIcon.png', loginLabel: 'Login with AmazonMusic', name: 'AmazonMusic'};
+			return {icon: 'assets/AmazonIcon.png', loginLabel: 'Not Yet', name: 'AmazonMusic'};
 		default:
 			return {icon: 'assets/SpotifyIcon.png', loginLabel: 'Login with Spotify', name: 'Spotify'};
 	}
@@ -6591,6 +6591,7 @@ var $author$project$Main$receiveAppleUserToken = _Platform_incomingPort('receive
 var $author$project$Main$subscriptions = function (model) {
 	return $author$project$Main$receiveAppleUserToken($author$project$Main$GotAppleUserToken);
 };
+var $author$project$Main$About = {$: 'About'};
 var $author$project$Main$AppleLoginAgain = {$: 'AppleLoginAgain'};
 var $author$project$Main$Done = {$: 'Done'};
 var $author$project$Main$FetchApplePlaylists = {$: 'FetchApplePlaylists'};
@@ -6663,22 +6664,60 @@ var $author$project$Main$decodeYoutubePlaylists = $elm$json$Json$Decode$list($au
 var $author$project$Main$DonateResponse = function (a) {
 	return {$: 'DonateResponse', a: a};
 };
-var $elm$http$Http$expectString = function (toMsg) {
+var $author$project$Main$donateDecoder = A2($elm$json$Json$Decode$field, 'url', $elm$json$Json$Decode$string);
+var $elm$json$Json$Encode$int = _Json_wrap;
+var $elm$http$Http$jsonBody = function (value) {
 	return A2(
-		$elm$http$Http$expectStringResponse,
-		toMsg,
-		$elm$http$Http$resolve($elm$core$Result$Ok));
+		_Http_pair,
+		'application/json',
+		A2($elm$json$Json$Encode$encode, 0, value));
+};
+var $elm$json$Json$Encode$object = function (pairs) {
+	return _Json_wrap(
+		A3(
+			$elm$core$List$foldl,
+			F2(
+				function (_v0, obj) {
+					var k = _v0.a;
+					var v = _v0.b;
+					return A3(_Json_addField, k, v, obj);
+				}),
+			_Json_emptyObject(_Utils_Tuple0),
+			pairs));
 };
 var $elm$http$Http$post = function (r) {
 	return $elm$http$Http$request(
 		{body: r.body, expect: r.expect, headers: _List_Nil, method: 'POST', timeout: $elm$core$Maybe$Nothing, tracker: $elm$core$Maybe$Nothing, url: r.url});
 };
-var $author$project$Main$donateRequest = $elm$http$Http$post(
-	{
-		body: $elm$http$Http$emptyBody,
-		expect: $elm$http$Http$expectString($author$project$Main$DonateResponse),
-		url: '/api/donate'
-	});
+var $elm$json$Json$Encode$string = _Json_wrap;
+var $author$project$Main$donateRequest = function (model) {
+	return $elm$http$Http$post(
+		{
+			body: $elm$http$Http$jsonBody(
+				$elm$json$Json$Encode$object(
+					_List_fromArray(
+						[
+							_Utils_Tuple2(
+							'amount',
+							$elm$json$Json$Encode$int(model.donationAmount)),
+							_Utils_Tuple2(
+							'currency',
+							function () {
+								var _v0 = model.currency;
+								switch (_v0.$) {
+									case 'USD':
+										return $elm$json$Json$Encode$string('usd');
+									case 'JPY':
+										return $elm$json$Json$Encode$string('jpy');
+									default:
+										return $elm$json$Json$Encode$string('eur');
+								}
+							}())
+						]))),
+			expect: A2($elm$http$Http$expectJson, $author$project$Main$DonateResponse, $author$project$Main$donateDecoder),
+			url: '/api/donate'
+		});
+};
 var $author$project$Main$serviceKey = function (s) {
 	switch (s.$) {
 		case 'Apple':
@@ -6697,6 +6736,12 @@ var $author$project$Main$encodeList = A2(
 	$elm$core$String$join(','));
 var $author$project$Main$encodeUrlFromModel = function (m) {
 	return '/?left=' + ($author$project$Main$encodeList(m.leftList) + ('&right=' + ($author$project$Main$encodeList(m.rightList) + ('&li=' + $elm$core$String$fromInt(m.leftIndex)))));
+};
+var $elm$http$Http$expectString = function (toMsg) {
+	return A2(
+		$elm$http$Http$expectStringResponse,
+		toMsg,
+		$elm$http$Http$resolve($elm$core$Result$Ok));
 };
 var $elm$http$Http$expectBytesResponse = F2(
 	function (toMsg, toResult) {
@@ -6733,12 +6778,6 @@ var $elm$core$List$isEmpty = function (xs) {
 		return false;
 	}
 };
-var $elm$http$Http$jsonBody = function (value) {
-	return A2(
-		_Http_pair,
-		'application/json',
-		A2($elm$json$Json$Encode$encode, 0, value));
-};
 var $elm$browser$Browser$Navigation$load = _Browser_load;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
 var $elm$url$Url$percentEncode = _Url_percentEncode;
@@ -6750,10 +6789,10 @@ var $author$project$Main$loginCmd = F2(
 			case 'Apple':
 				return $author$project$Main$appleLogin(_Utils_Tuple0);
 			case 'Spotify':
-				return $elm$browser$Browser$Navigation$load('https://accounts.spotify.com/authorize' + ('?client_id=a0e8851f25054913bffdfec463b47679' + ('&response_type=code' + ('&redirect_uri=https://replaylist.ngrok.io/api/login/spotify/callback' + ('&scope=playlist-read-private+playlist-modify-private' + ('&state=' + encodedState))))));
+				return $elm$browser$Browser$Navigation$load('https://accounts.spotify.com/authorize' + ('?client_id=a0e8851f25054913bffdfec463b47679' + ('&response_type=code' + ('&redirect_uri=https://replaylist.online/api/login/spotify/callback' + ('&scope=playlist-read-private+playlist-modify-private' + ('&state=' + encodedState))))));
 			case 'Youtube':
 				return $elm$browser$Browser$Navigation$load(
-					'https://accounts.google.com/o/oauth2/v2/auth' + ('?response_type=code' + ('&client_id=' + ($elm$url$Url$percentEncode('263472270217-7ndt9q7oe9qm0r0dc01jaqu7p712a02h.apps.googleusercontent.com') + ('&redirect_uri=' + ($elm$url$Url$percentEncode('https://replaylist.ngrok.io/api/login/youtube/callback') + ('&scope=' + ($elm$url$Url$percentEncode('https://www.googleapis.com/auth/youtube.readonly') + ('&access_type=offline&include_granted_scopes=true&prompt=consent' + ('&state=' + encodedState))))))))));
+					'https://accounts.google.com/o/oauth2/v2/auth' + ('?response_type=code' + ('&client_id=' + ($elm$url$Url$percentEncode('263472270217-7ndt9q7oe9qm0r0dc01jaqu7p712a02h.apps.googleusercontent.com') + ('&redirect_uri=' + ($elm$url$Url$percentEncode('https://replaylist.online/api/login/youtube/callback') + ('&scope=' + ($elm$url$Url$percentEncode('https://www.googleapis.com/auth/youtube.readonly') + ('&access_type=offline&include_granted_scopes=true&prompt=consent' + ('&state=' + encodedState))))))))));
 			default:
 				return $elm$core$Platform$Cmd$none;
 		}
@@ -6762,24 +6801,10 @@ var $elm$core$Basics$min = F2(
 	function (x, y) {
 		return (_Utils_cmp(x, y) < 0) ? x : y;
 	});
-var $elm$json$Json$Encode$object = function (pairs) {
-	return _Json_wrap(
-		A3(
-			$elm$core$List$foldl,
-			F2(
-				function (_v0, obj) {
-					var k = _v0.a;
-					var v = _v0.b;
-					return A3(_Json_addField, k, v, obj);
-				}),
-			_Json_emptyObject(_Utils_Tuple0),
-			pairs));
-};
 var $elm$browser$Browser$Navigation$pushUrl = _Browser_pushUrl;
 var $author$project$Main$TransferFinished = function (a) {
 	return {$: 'TransferFinished', a: a};
 };
-var $elm$json$Json$Encode$int = _Json_wrap;
 var $elm$json$Json$Encode$list = F2(
 	function (func, entries) {
 		return _Json_wrap(
@@ -6789,7 +6814,6 @@ var $elm$json$Json$Encode$list = F2(
 				_Json_emptyArray(_Utils_Tuple0),
 				entries));
 	});
-var $elm$json$Json$Encode$string = _Json_wrap;
 var $author$project$Main$encodePlaylistItem = function (p) {
 	return $elm$json$Json$Encode$object(
 		_List_fromArray(
@@ -7352,6 +7376,12 @@ var $author$project$Main$update = F2(
 						model,
 						{body: $author$project$Main$Done}),
 					$elm$core$Platform$Cmd$none);
+			case 'GoAbout':
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{body: $author$project$Main$About}),
+					$elm$core$Platform$Cmd$none);
 			case 'LogoutAll':
 				return _Utils_Tuple2(
 					_Utils_update(
@@ -7551,10 +7581,24 @@ var $author$project$Main$update = F2(
 				}
 			case 'SelectCurrency':
 				var cur = msg.a;
+				var defaultAmount = function () {
+					switch (cur.$) {
+						case 'JPY':
+							return 100;
+						case 'USD':
+							return 1;
+						default:
+							return 1;
+					}
+				}();
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
-						{currency: cur}),
+						{
+							currency: cur,
+							donationAmount: defaultAmount,
+							selectedAmount: $elm$core$Maybe$Just(defaultAmount)
+						}),
 					$elm$core$Platform$Cmd$none);
 			case 'SelectAmount':
 				var amount = msg.a;
@@ -7578,7 +7622,9 @@ var $author$project$Main$update = F2(
 						{customAmount: str, donationAmount: parsed, selectedAmount: $elm$core$Maybe$Nothing}),
 					$elm$core$Platform$Cmd$none);
 			case 'DonateClick':
-				return _Utils_Tuple2(model, $author$project$Main$donateRequest);
+				return _Utils_Tuple2(
+					model,
+					$author$project$Main$donateRequest(model));
 			case 'DonateResponse':
 				if (msg.a.$ === 'Ok') {
 					var url = msg.a.a;
@@ -8105,7 +8151,7 @@ var $author$project$Main$bodyView = function (model) {
 							$elm$html$Html$text('Log in to both services to continue')
 						]));
 			}
-		default:
+		case 'Done':
 			return (!model.totalTransfers) ? A2(
 				$elm$html$Html$div,
 				_List_fromArray(
@@ -8168,6 +8214,86 @@ var $author$project$Main$bodyView = function (model) {
 								$elm$html$Html$text('Playlists migration in progress…')
 							]))
 					])));
+		default:
+			return A2(
+				$elm$html$Html$div,
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('about-container')
+					]),
+				_List_fromArray(
+					[
+						A2(
+						$elm$html$Html$div,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('about-title')
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('Operator Information / Legal Notice')
+							])),
+						A2(
+						$elm$html$Html$div,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('about-section')
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('● Operator Name: KAZUHISA NOGUCHI')
+							])),
+						A2(
+						$elm$html$Html$div,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('about-section')
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('● Address: Kuji City, Iwate Prefecture, Japan')
+							])),
+						A2(
+						$elm$html$Html$div,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('about-section')
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('● Contact Email: sarasvatizen@duck.com')
+							])),
+						A2(
+						$elm$html$Html$div,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('about-section')
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('● Pricing: Voluntary donations (from ¥100 / $1 / €1)')
+							])),
+						A2(
+						$elm$html$Html$div,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('about-section')
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('● Delivery of Goods: Not applicable (donation-based, no physical goods or services provided)')
+							])),
+						A2(
+						$elm$html$Html$div,
+						_List_fromArray(
+							[
+								$elm$html$Html$Attributes$class('about-section')
+							]),
+						_List_fromArray(
+							[
+								$elm$html$Html$text('● Refund Policy: Donations are non-refundable due to their voluntary nature')
+							]))
+					]));
 	}
 };
 var $author$project$Main$GoList = {$: 'GoList'};
@@ -8287,6 +8413,12 @@ var $elm$html$Html$Events$onInput = function (tagger) {
 			A2($elm$json$Json$Decode$map, tagger, $elm$html$Html$Events$targetValue)));
 };
 var $elm$html$Html$Attributes$placeholder = $elm$html$Html$Attributes$stringProperty('placeholder');
+var $author$project$Main$presetClass = F2(
+	function (model, val) {
+		return _Utils_eq(
+			model.selectedAmount,
+			$elm$core$Maybe$Just(val)) ? 'donation-btn active' : 'donation-btn';
+	});
 var $author$project$Main$donationEur = function (model) {
 	return A2(
 		$elm$html$Html$div,
@@ -8309,7 +8441,8 @@ var $author$project$Main$donationEur = function (model) {
 						$elm$html$Html$button,
 						_List_fromArray(
 							[
-								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Attributes$class(
+								A2($author$project$Main$presetClass, model, 1)),
 								$elm$html$Html$Events$onClick(
 								$author$project$Main$SelectAmount(1))
 							]),
@@ -8321,7 +8454,8 @@ var $author$project$Main$donationEur = function (model) {
 						$elm$html$Html$button,
 						_List_fromArray(
 							[
-								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Attributes$class(
+								A2($author$project$Main$presetClass, model, 5)),
 								$elm$html$Html$Events$onClick(
 								$author$project$Main$SelectAmount(5))
 							]),
@@ -8333,7 +8467,8 @@ var $author$project$Main$donationEur = function (model) {
 						$elm$html$Html$button,
 						_List_fromArray(
 							[
-								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Attributes$class(
+								A2($author$project$Main$presetClass, model, 10)),
 								$elm$html$Html$Events$onClick(
 								$author$project$Main$SelectAmount(10))
 							]),
@@ -8396,7 +8531,8 @@ var $author$project$Main$donationJpy = function (model) {
 						$elm$html$Html$button,
 						_List_fromArray(
 							[
-								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Attributes$class(
+								A2($author$project$Main$presetClass, model, 100)),
 								$elm$html$Html$Events$onClick(
 								$author$project$Main$SelectAmount(100))
 							]),
@@ -8408,7 +8544,8 @@ var $author$project$Main$donationJpy = function (model) {
 						$elm$html$Html$button,
 						_List_fromArray(
 							[
-								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Attributes$class(
+								A2($author$project$Main$presetClass, model, 500)),
 								$elm$html$Html$Events$onClick(
 								$author$project$Main$SelectAmount(500))
 							]),
@@ -8420,7 +8557,8 @@ var $author$project$Main$donationJpy = function (model) {
 						$elm$html$Html$button,
 						_List_fromArray(
 							[
-								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Attributes$class(
+								A2($author$project$Main$presetClass, model, 1000)),
 								$elm$html$Html$Events$onClick(
 								$author$project$Main$SelectAmount(1000))
 							]),
@@ -8457,7 +8595,7 @@ var $author$project$Main$donationJpy = function (model) {
 					]),
 				_List_fromArray(
 					[
-						$elm$html$Html$text('☕️Donate via Link☕️')
+						$elm$html$Html$text('Donate via Stripe-Link')
 					]))
 			]));
 };
@@ -8483,7 +8621,8 @@ var $author$project$Main$donationUsd = function (model) {
 						$elm$html$Html$button,
 						_List_fromArray(
 							[
-								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Attributes$class(
+								A2($author$project$Main$presetClass, model, 1)),
 								$elm$html$Html$Events$onClick(
 								$author$project$Main$SelectAmount(1))
 							]),
@@ -8495,7 +8634,8 @@ var $author$project$Main$donationUsd = function (model) {
 						$elm$html$Html$button,
 						_List_fromArray(
 							[
-								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Attributes$class(
+								A2($author$project$Main$presetClass, model, 5)),
 								$elm$html$Html$Events$onClick(
 								$author$project$Main$SelectAmount(5))
 							]),
@@ -8507,7 +8647,8 @@ var $author$project$Main$donationUsd = function (model) {
 						$elm$html$Html$button,
 						_List_fromArray(
 							[
-								$elm$html$Html$Attributes$class('donation-btn'),
+								$elm$html$Html$Attributes$class(
+								A2($author$project$Main$presetClass, model, 10)),
 								$elm$html$Html$Events$onClick(
 								$author$project$Main$SelectAmount(10))
 							]),
@@ -8633,7 +8774,7 @@ var $author$project$Main$footerView = function (model) {
 					]));
 		case 'List':
 			return A2($elm$html$Html$div, _List_Nil, _List_Nil);
-		default:
+		case 'Done':
 			var _v2 = model.currency;
 			switch (_v2.$) {
 				case 'USD':
@@ -8643,8 +8784,11 @@ var $author$project$Main$footerView = function (model) {
 				default:
 					return $author$project$Main$donationEur(model);
 			}
+		default:
+			return A2($elm$html$Html$div, _List_Nil, _List_Nil);
 	}
 };
+var $author$project$Main$GoAbout = {$: 'GoAbout'};
 var $author$project$Main$GoDone = {$: 'GoDone'};
 var $author$project$Main$GoHome = {$: 'GoHome'};
 var $author$project$Main$navLink = F3(
@@ -8713,7 +8857,13 @@ var $author$project$Main$header = function (model) {
 						$author$project$Main$navLink,
 						'done',
 						$author$project$Main$GoDone,
-						_Utils_eq(model.body, $author$project$Main$Done))
+						_Utils_eq(model.body, $author$project$Main$Done)),
+						$elm$html$Html$text(' | '),
+						A3(
+						$author$project$Main$navLink,
+						'about',
+						$author$project$Main$GoAbout,
+						_Utils_eq(model.body, $author$project$Main$About))
 					]))
 			]));
 };
