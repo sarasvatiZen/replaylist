@@ -18,7 +18,9 @@
             app.ports.appleLogin.subscribe(async () => {
                 try {
                     const { token: devToken } = await (
-                        await fetch("/api/apple/devtoken")
+                        await fetch(
+                            "https://replaylist.online/api/apple/devtoken",
+                        )
                     ).json();
 
                     MusicKit.configure({

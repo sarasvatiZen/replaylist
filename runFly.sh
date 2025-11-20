@@ -32,7 +32,7 @@ while IFS='=' read -r key value; do
   # Apple の秘密鍵だけは特殊処理（p8 中身を渡す）
   if [[ "$key" == "APPLE_PRIVATE_KEY_PATH" ]]; then
     echo "  -> APPLE_PRIVATE_KEY_CONTENTS をセット"
-    fly secrets set APPLE_PRIVATE_KEY_CONTENTS="$(cat backend/keys/appleAPILogin.p8)"
+    fly secrets set APPLE_PRIVATE_KEY_CONTENTS="$(cat backend/keys/appleAPILogin2.p8)"
     continue
   fi
 

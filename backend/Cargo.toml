@@ -15,3 +15,5 @@ urlencoding = "2"
 jsonwebtoken = { version = "9", features = ["use_pem"] }
 base64 = "0.22"
 anyhow = "1.0.100"
+actix-cors = "0.7.1"
+uuid = { version = "1.18.1", features = ["v4"] }

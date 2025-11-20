@@ -121,6 +121,8 @@ type Msg
     | UpdateCustomAmount String
     | DonateClick
     | DonateResponse (Result Http.Error String)
+    | SquareDonateClick
+    | SquareDonateResponse (Result Http.Error String)
     | NoOp
 
 
@@ -875,6 +877,15 @@ update msg model =
         DonateResponse (Err _) ->
             ( model, Cmd.none )
 
+        SquareDonateClick ->
+            ( model, squareDonateRequest model )
+
+        SquareDonateResponse (Ok url) ->
+            ( model, Browser.Navigation.load url )
+
+        SquareDonateResponse (Err _) ->
+            ( model, Cmd.none )
+
         NoOp ->
             ( model, Cmd.none )
 
@@ -1354,8 +1365,11 @@ donationJpy model =
                 ]
                 []
             ]
-        , button [ class "donate-btn", onClick DonateClick ]
-            [ text "Donate via Stripe-Link" ]
+
+        -- , button [ class "donate-btn", onClick DonateClick ]
+        --     [ text "Donate via Stripe" ]
+        , button [ class "donate-btn", onClick SquareDonateClick ]
+            [ text "Support via Square" ]
         ]
 
 
@@ -1389,8 +1403,11 @@ donationUsd model =
                 ]
                 []
             ]
-        , button [ class "donate-btn", onClick DonateClick ]
-            [ text "☕️Donate via Link☕️" ]
+
+        -- , button [ class "donate-btn", onClick DonateClick ]
+        --     [ text "Donate via Stripe" ]
+        , button [ class "donate-btn", onClick SquareDonateClick ]
+            [ text "USD is not supported yet" ]
         ]
 
 
@@ -1424,8 +1441,11 @@ donationEur model =
                 ]
                 []
             ]
-        , button [ class "donate-btn", onClick DonateClick ]
-            [ text "☕️Donate via Link☕️" ]
+
+        -- , button [ class "donate-btn", onClick DonateClick ]
+        --     [ text "Donate via Stripe" ]
+        , button [ class "donate-btn", onClick SquareDonateClick ]
+            [ text "EUR is not supported yet" ]
         ]
 
 
@@ -1465,6 +1485,32 @@ donateRequest model =
 donateDecoder : D.Decoder String
 donateDecoder =
     D.field "url" D.string
+
+
+squareDonateRequest : Model -> Cmd Msg
+squareDonateRequest model =
+    let
+        currencyStr =
+            case model.currency of
+                USD ->
+                    "USD"
+
+                JPY ->
+                    "JPY"
+
+                EUR ->
+                    "EUR"
+    in
+    Http.post
+        { url = "/api/square/checkout"
+        , body =
+            Http.jsonBody <|
+                E.object
+                    [ ( "amount", E.int model.donationAmount )
+                    , ( "currency", E.string currencyStr )
+                    ]
+        , expect = Http.expectJson SquareDonateResponse donateDecoder
+        }
 
 
 subscriptions model =

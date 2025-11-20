@@ -7063,6 +7063,38 @@ var $elm_community$list_extra$List$Extra$setAt = F2(
 			$elm$core$Basics$always(value));
 	});
 var $elm$core$Process$sleep = _Process_sleep;
+var $author$project$Main$SquareDonateResponse = function (a) {
+	return {$: 'SquareDonateResponse', a: a};
+};
+var $author$project$Main$squareDonateRequest = function (model) {
+	var currencyStr = function () {
+		var _v0 = model.currency;
+		switch (_v0.$) {
+			case 'USD':
+				return 'USD';
+			case 'JPY':
+				return 'JPY';
+			default:
+				return 'EUR';
+		}
+	}();
+	return $elm$http$Http$post(
+		{
+			body: $elm$http$Http$jsonBody(
+				$elm$json$Json$Encode$object(
+					_List_fromArray(
+						[
+							_Utils_Tuple2(
+							'amount',
+							$elm$json$Json$Encode$int(model.donationAmount)),
+							_Utils_Tuple2(
+							'currency',
+							$elm$json$Json$Encode$string(currencyStr))
+						]))),
+			expect: A2($elm$http$Http$expectJson, $author$project$Main$SquareDonateResponse, $author$project$Main$donateDecoder),
+			url: '/api/square/checkout'
+		});
+};
 var $elm$core$Result$withDefault = F2(
 	function (def, result) {
 		if (result.$ === 'Ok') {
@@ -7626,6 +7658,19 @@ var $author$project$Main$update = F2(
 					model,
 					$author$project$Main$donateRequest(model));
 			case 'DonateResponse':
+				if (msg.a.$ === 'Ok') {
+					var url = msg.a.a;
+					return _Utils_Tuple2(
+						model,
+						$elm$browser$Browser$Navigation$load(url));
+				} else {
+					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+				}
+			case 'SquareDonateClick':
+				return _Utils_Tuple2(
+					model,
+					$author$project$Main$squareDonateRequest(model));
+			case 'SquareDonateResponse':
 				if (msg.a.$ === 'Ok') {
 					var url = msg.a.a;
 					return _Utils_Tuple2(
@@ -8298,10 +8343,10 @@ var $author$project$Main$bodyView = function (model) {
 };
 var $author$project$Main$GoList = {$: 'GoList'};
 var $author$project$Main$LogoutAll = {$: 'LogoutAll'};
-var $author$project$Main$DonateClick = {$: 'DonateClick'};
 var $author$project$Main$SelectAmount = function (a) {
 	return {$: 'SelectAmount', a: a};
 };
+var $author$project$Main$SquareDonateClick = {$: 'SquareDonateClick'};
 var $author$project$Main$UpdateCustomAmount = function (a) {
 	return {$: 'UpdateCustomAmount', a: a};
 };
@@ -8501,11 +8546,11 @@ var $author$project$Main$donationEur = function (model) {
 				_List_fromArray(
 					[
 						$elm$html$Html$Attributes$class('donate-btn'),
-						$elm$html$Html$Events$onClick($author$project$Main$DonateClick)
+						$elm$html$Html$Events$onClick($author$project$Main$SquareDonateClick)
 					]),
 				_List_fromArray(
 					[
-						$elm$html$Html$text('☕️Donate via Link☕️')
+						$elm$html$Html$text('Support via Square')
 					]))
 			]));
 };
@@ -8591,11 +8636,11 @@ var $author$project$Main$donationJpy = function (model) {
 				_List_fromArray(
 					[
 						$elm$html$Html$Attributes$class('donate-btn'),
-						$elm$html$Html$Events$onClick($author$project$Main$DonateClick)
+						$elm$html$Html$Events$onClick($author$project$Main$SquareDonateClick)
 					]),
 				_List_fromArray(
 					[
-						$elm$html$Html$text('Donate via Stripe-Link')
+						$elm$html$Html$text('Support via Square')
 					]))
 			]));
 };
@@ -8681,11 +8726,11 @@ var $author$project$Main$donationUsd = function (model) {
 				_List_fromArray(
 					[
 						$elm$html$Html$Attributes$class('donate-btn'),
-						$elm$html$Html$Events$onClick($author$project$Main$DonateClick)
+						$elm$html$Html$Events$onClick($author$project$Main$SquareDonateClick)
 					]),
 				_List_fromArray(
 					[
-						$elm$html$Html$text('☕️Donate via Link☕️')
+						$elm$html$Html$text('Support via Square')
 					]))
 			]));
 };

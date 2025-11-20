@@ -1,16 +1,71 @@
+use actix_cors::Cors;
 use actix_files::Files;
 use actix_session::{storage::CookieSessionStore, Session, SessionMiddleware};
 use actix_web::cookie::{Key, SameSite};
-use actix_web::{get, post, route, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, post, route, web, App, Error, HttpResponse, HttpServer, Responder};
 use base64::{engine::general_purpose, Engine as _};
 use dotenv::dotenv;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
-    env, fs,
+    env,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+#[derive(Deserialize)]
+pub struct SquareRequest {
+    amount: i64,
+    currency: String,
+}
+
+#[derive(Serialize)]
+pub struct SquareResponse {
+    url: String,
+}
+
+#[post("/api/square/checkout")]
+pub async fn create_square_checkout(
+    req: web::Json<SquareRequest>,
+) -> Result<web::Json<SquareResponse>, Error> {
+    let square_api_key = std::env::var("SQUARE_API_KEY").expect("SQUARE_API_KEY missing");
+    let location_id = std::env::var("SQUARE_LOCATION_ID").expect("SQUARE_LOCATION_ID missing");
+
+    let client = Client::new();
+
+    let body = serde_json::json!({
+        "idempotency_key": uuid::Uuid::new_v4().to_string(),
+        "quick_pay": {
+            "name": "REPLAYLIST donation",
+            "price_money": {
+                "amount": req.amount,
+                "currency": req.currency.to_uppercase()
+            },
+            "location_id": location_id
+        }
+    });
+
+    let resp = client
+        .post("https://connect.squareupsandbox.com/v2/online-checkout/payment-links")
+        .bearer_auth(square_api_key)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| {
+            println!("Square error: {:?}", e);
+            actix_web::error::ErrorInternalServerError("Square request failed")
+        })?
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| {
+            println!("Square JSON error: {:?}", e);
+            actix_web::error::ErrorInternalServerError("Square response decode failed")
+        })?;
+
+    let url = resp["payment_link"]["url"].as_str().unwrap().to_string();
+
+    Ok(web::Json(SquareResponse { url }))
+}
 
 #[derive(Deserialize)]
 struct DonatePayload {
@@ -639,31 +694,6 @@ pub async fn fetch_youtube_playlists(access_token: &str) -> anyhow::Result<Vec<P
     Ok(playlists)
 }
 
-fn make_apple_dev_token() -> Result<String, String> {
-    let private_key_path = env::var("APPLE_PRIVATE_KEY_PATH").map_err(|e| e.to_string())?;
-    let key_id = env::var("APPLE_KEY_ID").map_err(|e| e.to_string())?;
-    let team_id = env::var("APPLE_TEAM_ID").map_err(|e| e.to_string())?;
-    let pem = fs::read_to_string(private_key_path).map_err(|e| e.to_string())?;
-
-    let header = Header {
-        alg: Algorithm::ES256,
-        kid: Some(key_id),
-        ..Default::default()
-    };
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as usize;
-    let claims = AppleClaims {
-        iss: team_id,
-        iat: now,
-        exp: now + 60 * 60 * 24 * 180,
-    };
-
-    let key = EncodingKey::from_ec_pem(pem.as_bytes()).map_err(|e| e.to_string())?;
-    encode(&header, &claims, &key).map_err(|e| e.to_string())
-}
-
 #[get("/api/apple/devtoken")]
 async fn apple_devtoken() -> impl Responder {
     match make_apple_dev_token() {
@@ -1040,6 +1070,33 @@ async fn youtube_login() -> impl Responder {
         .finish()
 }
 
+fn make_apple_dev_token() -> Result<String, String> {
+    let key_id = env::var("APPLE_KEY_ID").map_err(|e| e.to_string())?;
+    let team_id = env::var("APPLE_TEAM_ID").map_err(|e| e.to_string())?;
+
+    let pem = env::var("APPLE_PRIVATE_KEY_CONTENTS").map_err(|e| e.to_string())?;
+
+    let header = Header {
+        alg: Algorithm::ES256,
+        kid: Some(key_id),
+        ..Default::default()
+    };
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as usize;
+
+    let claims = AppleClaims {
+        iss: team_id,
+        iat: now,
+        exp: now + 86400 * 180,
+    };
+
+    let key = EncodingKey::from_ec_pem(pem.as_bytes()).map_err(|e| e.to_string())?;
+    encode(&header, &claims, &key).map_err(|e| e.to_string())
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv().ok();
@@ -1050,7 +1107,16 @@ async fn main() -> std::io::Result<()> {
     let bind_addr = format!("0.0.0.0:{}", port);
 
     HttpServer::new(move || {
+        let cors = Cors::default()
+            .allowed_origin("https://replaylist.online")
+            .allowed_origin("https://www.replaylist.online")
+            .allowed_origin("https://replaylist.fly.dev")
+            .allowed_methods(vec!["GET", "POST"])
+            .allowed_headers(vec![actix_web::http::header::CONTENT_TYPE])
+            .supports_credentials();
+
         App::new()
+            .wrap(cors)
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), secret_key.clone())
                     .cookie_name("replaylist.sid".into())
@@ -1078,6 +1144,7 @@ async fn main() -> std::io::Result<()> {
             .service(transfer_to_youtube)
             .service(save_apple_user_token)
             .service(donate)
+            .service(create_square_checkout)
             .service(Files::new("/", "../frontend").index_file("index.html"))
     })
     .bind(bind_addr)?
