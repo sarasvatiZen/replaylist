@@ -8550,7 +8550,7 @@ var $author$project$Main$donationEur = function (model) {
 					]),
 				_List_fromArray(
 					[
-						$elm$html$Html$text('Support via Square')
+						$elm$html$Html$text('EUR is not supported yet')
 					]))
 			]));
 };
@@ -8730,7 +8730,7 @@ var $author$project$Main$donationUsd = function (model) {
 					]),
 				_List_fromArray(
 					[
-						$elm$html$Html$text('Support via Square')
+						$elm$html$Html$text('USD is not supported yet')
 					]))
 			]));
 };

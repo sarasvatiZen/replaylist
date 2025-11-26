@@ -710,7 +710,6 @@ async fn login_callback(
     session: Session,
 ) -> impl Responder {
     let service = path.into_inner();
-    let _ = session.insert(&service, true);
 
     let code_opt = q
         .code
@@ -776,7 +775,6 @@ async fn login_callback(
             if let Some(rf) = json["refresh_token"].as_str() {
                 let _ = session.insert("youtube_refresh_token", rf.to_string());
             }
-            let _ = session.insert("youtube", true);
         }
     }
 
@@ -816,14 +814,16 @@ async fn login_status(session: Session) -> impl Responder {
         .get::<String>("apple_user_token")
         .unwrap_or(None)
         .is_some();
+
     let spotify_logged_in = session
-        .get::<String>("spotify_access_token")
+        .get::<String>("spotify_refresh_token")
         .unwrap_or(None)
         .is_some();
+
     let youtube_logged_in = session
-        .get::<bool>("youtube")
+        .get::<String>("youtube_refresh_token")
         .unwrap_or(None)
-        .unwrap_or(false);
+        .is_some();
 
     HttpResponse::Ok().json(serde_json::json!({
         "apple": apple_logged_in,
