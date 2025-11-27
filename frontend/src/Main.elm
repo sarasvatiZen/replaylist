@@ -87,7 +87,6 @@ type Body
     = Home
     | List
     | Done
-    | About
 
 
 type Msg
@@ -97,7 +96,6 @@ type Msg
     | GoHome
     | GoList
     | GoDone
-    | GoAbout
     | Swap
     | NextService
     | PrevService
@@ -660,9 +658,6 @@ update msg model =
         GoDone ->
             ( { model | body = Done }, Cmd.none )
 
-        GoAbout ->
-            ( { model | body = About }, Cmd.none )
-
         LogoutAll ->
             ( { model | loginStatuses = Dict.empty }
             , Http.post
@@ -976,9 +971,6 @@ parseBody url =
         "/done" ->
             Done
 
-        "/about" ->
-            About
-
         _ ->
             Home
 
@@ -1032,8 +1024,6 @@ header model =
             , navLink "list" GoList (model.body == List)
             , text " | "
             , navLink "done" GoDone (model.body == Done)
-            , text " | "
-            , navLink "about" GoAbout (model.body == About)
             ]
         ]
 
@@ -1119,23 +1109,6 @@ bodyView model =
                     , div [ class "done-loading-text" ]
                         [ text "Playlists migration in progress…" ]
                     ]
-
-        About ->
-            div [ class "about-container" ]
-                [ div [ class "about-title" ] [ text "Operator Information / Legal Notice" ]
-                , div [ class "about-section" ]
-                    [ text "● Operator Name: KAZUHISA NOGUCHI" ]
-                , div [ class "about-section" ]
-                    [ text "● Address: Kuji City, Iwate Prefecture, Japan" ]
-                , div [ class "about-section" ]
-                    [ text "● Contact Email: sarasvatizen@duck.com" ]
-                , div [ class "about-section" ]
-                    [ text "● Pricing: Voluntary donations (from ¥100 / $1 / €1)" ]
-                , div [ class "about-section" ]
-                    [ text "● Delivery of Goods: Not applicable (donation-based, no physical goods or services provided)" ]
-                , div [ class "about-section" ]
-                    [ text "● Refund Policy: Donations are non-refundable due to their voluntary nature" ]
-                ]
 
 
 headerRow : Bool -> Html Msg
@@ -1288,9 +1261,6 @@ footerView model =
 
                 EUR ->
                     donationEur model
-
-        About ->
-            div [] []
 
 
 type Currency

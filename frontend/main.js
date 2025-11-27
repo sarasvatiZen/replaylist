@@ -6591,7 +6591,6 @@ var $author$project$Main$receiveAppleUserToken = _Platform_incomingPort('receive
 var $author$project$Main$subscriptions = function (model) {
 	return $author$project$Main$receiveAppleUserToken($author$project$Main$GotAppleUserToken);
 };
-var $author$project$Main$About = {$: 'About'};
 var $author$project$Main$AppleLoginAgain = {$: 'AppleLoginAgain'};
 var $author$project$Main$Done = {$: 'Done'};
 var $author$project$Main$FetchApplePlaylists = {$: 'FetchApplePlaylists'};
@@ -7408,12 +7407,6 @@ var $author$project$Main$update = F2(
 						model,
 						{body: $author$project$Main$Done}),
 					$elm$core$Platform$Cmd$none);
-			case 'GoAbout':
-				return _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{body: $author$project$Main$About}),
-					$elm$core$Platform$Cmd$none);
 			case 'LogoutAll':
 				return _Utils_Tuple2(
 					_Utils_update(
@@ -8196,7 +8189,7 @@ var $author$project$Main$bodyView = function (model) {
 							$elm$html$Html$text('Log in to both services to continue')
 						]));
 			}
-		case 'Done':
+		default:
 			return (!model.totalTransfers) ? A2(
 				$elm$html$Html$div,
 				_List_fromArray(
@@ -8259,86 +8252,6 @@ var $author$project$Main$bodyView = function (model) {
 								$elm$html$Html$text('Playlists migration in progress…')
 							]))
 					])));
-		default:
-			return A2(
-				$elm$html$Html$div,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class('about-container')
-					]),
-				_List_fromArray(
-					[
-						A2(
-						$elm$html$Html$div,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class('about-title')
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('Operator Information / Legal Notice')
-							])),
-						A2(
-						$elm$html$Html$div,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class('about-section')
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('● Operator Name: KAZUHISA NOGUCHI')
-							])),
-						A2(
-						$elm$html$Html$div,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class('about-section')
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('● Address: Kuji City, Iwate Prefecture, Japan')
-							])),
-						A2(
-						$elm$html$Html$div,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class('about-section')
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('● Contact Email: sarasvatizen@duck.com')
-							])),
-						A2(
-						$elm$html$Html$div,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class('about-section')
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('● Pricing: Voluntary donations (from ¥100 / $1 / €1)')
-							])),
-						A2(
-						$elm$html$Html$div,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class('about-section')
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('● Delivery of Goods: Not applicable (donation-based, no physical goods or services provided)')
-							])),
-						A2(
-						$elm$html$Html$div,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class('about-section')
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('● Refund Policy: Donations are non-refundable due to their voluntary nature')
-							]))
-					]));
 	}
 };
 var $author$project$Main$GoList = {$: 'GoList'};
@@ -8819,7 +8732,7 @@ var $author$project$Main$footerView = function (model) {
 					]));
 		case 'List':
 			return A2($elm$html$Html$div, _List_Nil, _List_Nil);
-		case 'Done':
+		default:
 			var _v2 = model.currency;
 			switch (_v2.$) {
 				case 'USD':
@@ -8829,11 +8742,8 @@ var $author$project$Main$footerView = function (model) {
 				default:
 					return $author$project$Main$donationEur(model);
 			}
-		default:
-			return A2($elm$html$Html$div, _List_Nil, _List_Nil);
 	}
 };
-var $author$project$Main$GoAbout = {$: 'GoAbout'};
 var $author$project$Main$GoDone = {$: 'GoDone'};
 var $author$project$Main$GoHome = {$: 'GoHome'};
 var $author$project$Main$navLink = F3(
@@ -8902,13 +8812,7 @@ var $author$project$Main$header = function (model) {
 						$author$project$Main$navLink,
 						'done',
 						$author$project$Main$GoDone,
-						_Utils_eq(model.body, $author$project$Main$Done)),
-						$elm$html$Html$text(' | '),
-						A3(
-						$author$project$Main$navLink,
-						'about',
-						$author$project$Main$GoAbout,
-						_Utils_eq(model.body, $author$project$Main$About))
+						_Utils_eq(model.body, $author$project$Main$Done))
 					]))
 			]));
 };

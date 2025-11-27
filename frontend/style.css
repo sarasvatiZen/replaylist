@@ -507,7 +507,7 @@ body {
     font-size: 18px;
     font-weight: 700;
     cursor: pointer;
-    background: #006AFF;
+    background: #006aff;
     color: white;
 }
 
@@ -545,36 +545,4 @@ body {
     border-radius: 30px;
     transition: transform 0.25s ease;
     z-index: 1;
-}
-
-.about-container {
-    max-width: 720px;
-    margin: 40px auto;
-    padding: 32px 36px;
-    background: rgba(0, 0, 0, 0.35);
-    border-radius: 28px;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
-    color: #f0f0f0;
-    line-height: 1.7;
-    font-size: 16px;
-}
-
-.about-title {
-    font-size: 22px;
-    font-weight: 700;
-    text-align: center;
-    margin-bottom: 28px;
-    color: #ffffff;
-    letter-spacing: 0.03em;
-}
-
-.about-section {
-    margin-bottom: 14px;
-    background: rgba(255, 255, 255, 0.05);
-    padding: 10px 14px;
-    border-radius: 12px;
-    border-left: 4px solid #4da3ff;
-
-.about-section:last-child {
-    margin-bottom: 0;
 }
