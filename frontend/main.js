@@ -5363,7 +5363,6 @@ var $elm$core$Task$perform = F2(
 var $elm$browser$Browser$application = _Browser_application;
 var $author$project$Main$Apple = {$: 'Apple'};
 var $author$project$Main$Home = {$: 'Home'};
-var $author$project$Main$JPY = {$: 'JPY'};
 var $author$project$Main$Spotify = {$: 'Spotify'};
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
 var $elm$core$Dict$RBEmpty_elm_builtin = {$: 'RBEmpty_elm_builtin'};
@@ -6556,11 +6555,8 @@ var $author$project$Main$init = F3(
 			appleRaw: $elm$core$Maybe$Nothing,
 			appleUserToken: $elm$core$Maybe$Nothing,
 			body: $author$project$Main$Home,
-			currency: $author$project$Main$JPY,
 			currentFromType: curFrom,
 			currentToType: curTo,
-			customAmount: '',
-			donationAmount: 100,
 			from: $author$project$Main$serviceFromType(curFrom),
 			isLoading: false,
 			key: key,
@@ -6568,7 +6564,6 @@ var $author$project$Main$init = F3(
 			leftList: leftL,
 			loginStatuses: $elm$core$Dict$empty,
 			rightList: rightL,
-			selectedAmount: $elm$core$Maybe$Just(100),
 			spotifyPlaylists: _List_Nil,
 			spotifyRaw: $elm$core$Maybe$Nothing,
 			to: $author$project$Main$serviceFromType(curTo),
@@ -6660,63 +6655,6 @@ var $author$project$Main$decodePlaylistItem = A7(
 var $author$project$Main$decodeApplePlaylists = $elm$json$Json$Decode$list($author$project$Main$decodePlaylistItem);
 var $author$project$Main$decodeSpotifyPlaylists = $elm$json$Json$Decode$list($author$project$Main$decodePlaylistItem);
 var $author$project$Main$decodeYoutubePlaylists = $elm$json$Json$Decode$list($author$project$Main$decodePlaylistItem);
-var $author$project$Main$DonateResponse = function (a) {
-	return {$: 'DonateResponse', a: a};
-};
-var $author$project$Main$donateDecoder = A2($elm$json$Json$Decode$field, 'url', $elm$json$Json$Decode$string);
-var $elm$json$Json$Encode$int = _Json_wrap;
-var $elm$http$Http$jsonBody = function (value) {
-	return A2(
-		_Http_pair,
-		'application/json',
-		A2($elm$json$Json$Encode$encode, 0, value));
-};
-var $elm$json$Json$Encode$object = function (pairs) {
-	return _Json_wrap(
-		A3(
-			$elm$core$List$foldl,
-			F2(
-				function (_v0, obj) {
-					var k = _v0.a;
-					var v = _v0.b;
-					return A3(_Json_addField, k, v, obj);
-				}),
-			_Json_emptyObject(_Utils_Tuple0),
-			pairs));
-};
-var $elm$http$Http$post = function (r) {
-	return $elm$http$Http$request(
-		{body: r.body, expect: r.expect, headers: _List_Nil, method: 'POST', timeout: $elm$core$Maybe$Nothing, tracker: $elm$core$Maybe$Nothing, url: r.url});
-};
-var $elm$json$Json$Encode$string = _Json_wrap;
-var $author$project$Main$donateRequest = function (model) {
-	return $elm$http$Http$post(
-		{
-			body: $elm$http$Http$jsonBody(
-				$elm$json$Json$Encode$object(
-					_List_fromArray(
-						[
-							_Utils_Tuple2(
-							'amount',
-							$elm$json$Json$Encode$int(model.donationAmount)),
-							_Utils_Tuple2(
-							'currency',
-							function () {
-								var _v0 = model.currency;
-								switch (_v0.$) {
-									case 'USD':
-										return $elm$json$Json$Encode$string('usd');
-									case 'JPY':
-										return $elm$json$Json$Encode$string('jpy');
-									default:
-										return $elm$json$Json$Encode$string('eur');
-								}
-							}())
-						]))),
-			expect: A2($elm$http$Http$expectJson, $author$project$Main$DonateResponse, $author$project$Main$donateDecoder),
-			url: '/api/donate'
-		});
-};
 var $author$project$Main$serviceKey = function (s) {
 	switch (s.$) {
 		case 'Apple':
@@ -6777,6 +6715,12 @@ var $elm$core$List$isEmpty = function (xs) {
 		return false;
 	}
 };
+var $elm$http$Http$jsonBody = function (value) {
+	return A2(
+		_Http_pair,
+		'application/json',
+		A2($elm$json$Json$Encode$encode, 0, value));
+};
 var $elm$browser$Browser$Navigation$load = _Browser_load;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
 var $elm$url$Url$percentEncode = _Url_percentEncode;
@@ -6800,10 +6744,28 @@ var $elm$core$Basics$min = F2(
 	function (x, y) {
 		return (_Utils_cmp(x, y) < 0) ? x : y;
 	});
+var $elm$json$Json$Encode$object = function (pairs) {
+	return _Json_wrap(
+		A3(
+			$elm$core$List$foldl,
+			F2(
+				function (_v0, obj) {
+					var k = _v0.a;
+					var v = _v0.b;
+					return A3(_Json_addField, k, v, obj);
+				}),
+			_Json_emptyObject(_Utils_Tuple0),
+			pairs));
+};
+var $elm$http$Http$post = function (r) {
+	return $elm$http$Http$request(
+		{body: r.body, expect: r.expect, headers: _List_Nil, method: 'POST', timeout: $elm$core$Maybe$Nothing, tracker: $elm$core$Maybe$Nothing, url: r.url});
+};
 var $elm$browser$Browser$Navigation$pushUrl = _Browser_pushUrl;
 var $author$project$Main$TransferFinished = function (a) {
 	return {$: 'TransferFinished', a: a};
 };
+var $elm$json$Json$Encode$int = _Json_wrap;
 var $elm$json$Json$Encode$list = F2(
 	function (func, entries) {
 		return _Json_wrap(
@@ -6813,6 +6775,7 @@ var $elm$json$Json$Encode$list = F2(
 				_Json_emptyArray(_Utils_Tuple0),
 				entries));
 	});
+var $elm$json$Json$Encode$string = _Json_wrap;
 var $author$project$Main$encodePlaylistItem = function (p) {
 	return $elm$json$Json$Encode$object(
 		_List_fromArray(
@@ -7062,38 +7025,6 @@ var $elm_community$list_extra$List$Extra$setAt = F2(
 			$elm$core$Basics$always(value));
 	});
 var $elm$core$Process$sleep = _Process_sleep;
-var $author$project$Main$SquareDonateResponse = function (a) {
-	return {$: 'SquareDonateResponse', a: a};
-};
-var $author$project$Main$squareDonateRequest = function (model) {
-	var currencyStr = function () {
-		var _v0 = model.currency;
-		switch (_v0.$) {
-			case 'USD':
-				return 'USD';
-			case 'JPY':
-				return 'JPY';
-			default:
-				return 'EUR';
-		}
-	}();
-	return $elm$http$Http$post(
-		{
-			body: $elm$http$Http$jsonBody(
-				$elm$json$Json$Encode$object(
-					_List_fromArray(
-						[
-							_Utils_Tuple2(
-							'amount',
-							$elm$json$Json$Encode$int(model.donationAmount)),
-							_Utils_Tuple2(
-							'currency',
-							$elm$json$Json$Encode$string(currencyStr))
-						]))),
-			expect: A2($elm$http$Http$expectJson, $author$project$Main$SquareDonateResponse, $author$project$Main$donateDecoder),
-			url: '/api/square/checkout'
-		});
-};
 var $elm$core$Result$withDefault = F2(
 	function (def, result) {
 		if (result.$ === 'Ok') {
@@ -7604,74 +7535,6 @@ var $author$project$Main$update = F2(
 							{transferDone: false}),
 						$elm$core$Platform$Cmd$none);
 				}
-			case 'SelectCurrency':
-				var cur = msg.a;
-				var defaultAmount = function () {
-					switch (cur.$) {
-						case 'JPY':
-							return 100;
-						case 'USD':
-							return 1;
-						default:
-							return 1;
-					}
-				}();
-				return _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{
-							currency: cur,
-							donationAmount: defaultAmount,
-							selectedAmount: $elm$core$Maybe$Just(defaultAmount)
-						}),
-					$elm$core$Platform$Cmd$none);
-			case 'SelectAmount':
-				var amount = msg.a;
-				return _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{
-							donationAmount: amount,
-							selectedAmount: $elm$core$Maybe$Just(amount)
-						}),
-					$elm$core$Platform$Cmd$none);
-			case 'UpdateCustomAmount':
-				var str = msg.a;
-				var parsed = A2(
-					$elm$core$Maybe$withDefault,
-					0,
-					$elm$core$String$toInt(str));
-				return _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{customAmount: str, donationAmount: parsed, selectedAmount: $elm$core$Maybe$Nothing}),
-					$elm$core$Platform$Cmd$none);
-			case 'DonateClick':
-				return _Utils_Tuple2(
-					model,
-					$author$project$Main$donateRequest(model));
-			case 'DonateResponse':
-				if (msg.a.$ === 'Ok') {
-					var url = msg.a.a;
-					return _Utils_Tuple2(
-						model,
-						$elm$browser$Browser$Navigation$load(url));
-				} else {
-					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-				}
-			case 'SquareDonateClick':
-				return _Utils_Tuple2(
-					model,
-					$author$project$Main$squareDonateRequest(model));
-			case 'SquareDonateResponse':
-				if (msg.a.$ === 'Ok') {
-					var url = msg.a.a;
-					return _Utils_Tuple2(
-						model,
-						$elm$browser$Browser$Navigation$load(url));
-				} else {
-					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-				}
 			default:
 				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 		}
@@ -7947,11 +7810,51 @@ var $author$project$Main$rightCard = F3(
 						]))
 				]));
 	});
+var $elm$html$Html$input = _VirtualDom_node('input');
+var $elm$html$Html$Attributes$placeholder = $elm$html$Html$Attributes$stringProperty('placeholder');
+var $elm$html$Html$Attributes$type_ = $elm$html$Html$Attributes$stringProperty('type');
+var $author$project$Main$supportContainer = A2(
+	$elm$html$Html$div,
+	_List_fromArray(
+		[
+			$elm$html$Html$Attributes$class('support-container')
+		]),
+	_List_fromArray(
+		[
+			A2(
+			$elm$html$Html$div,
+			_List_fromArray(
+				[
+					$elm$html$Html$Attributes$class('support-title')
+				]),
+			_List_fromArray(
+				[
+					$elm$html$Html$text('Support RE:PLAYLIST via STRK')
+				])),
+			A2(
+			$elm$html$Html$input,
+			_List_fromArray(
+				[
+					$elm$html$Html$Attributes$class('custom-input'),
+					$elm$html$Html$Attributes$type_('number'),
+					$elm$html$Html$Attributes$placeholder('Amount (STRK)')
+				]),
+			_List_Nil),
+			A2(
+			$elm$html$Html$button,
+			_List_fromArray(
+				[
+					$elm$html$Html$Attributes$class('donate-btn')
+				]),
+			_List_fromArray(
+				[
+					$elm$html$Html$text('Send STRK')
+				]))
+		]));
 var $author$project$Main$ToggleAll = function (a) {
 	return {$: 'ToggleAll', a: a};
 };
 var $author$project$Main$TransferSelected = {$: 'TransferSelected'};
-var $elm$html$Html$input = _VirtualDom_node('input');
 var $elm$json$Json$Decode$at = F2(
 	function (fields, decoder) {
 		return A3($elm$core$List$foldr, $elm$json$Json$Decode$field, decoder, fields);
@@ -7967,7 +7870,6 @@ var $elm$html$Html$Events$onCheck = function (tagger) {
 		'change',
 		A2($elm$json$Json$Decode$map, tagger, $elm$html$Html$Events$targetChecked));
 };
-var $elm$html$Html$Attributes$type_ = $elm$html$Html$Attributes$stringProperty('type');
 var $author$project$Main$headerRow = function (isLoading) {
 	return A2(
 		$elm$html$Html$div,
@@ -8207,7 +8109,8 @@ var $author$project$Main$bodyView = function (model) {
 						_List_fromArray(
 							[
 								$elm$html$Html$text('Select playlists')
-							]))
+							])),
+						$author$project$Main$supportContainer
 					])) : (model.transferDone ? A2(
 				$elm$html$Html$div,
 				_List_fromArray(
@@ -8256,397 +8159,6 @@ var $author$project$Main$bodyView = function (model) {
 };
 var $author$project$Main$GoList = {$: 'GoList'};
 var $author$project$Main$LogoutAll = {$: 'LogoutAll'};
-var $author$project$Main$SelectAmount = function (a) {
-	return {$: 'SelectAmount', a: a};
-};
-var $author$project$Main$SquareDonateClick = {$: 'SquareDonateClick'};
-var $author$project$Main$UpdateCustomAmount = function (a) {
-	return {$: 'UpdateCustomAmount', a: a};
-};
-var $author$project$Main$EUR = {$: 'EUR'};
-var $author$project$Main$SelectCurrency = function (a) {
-	return {$: 'SelectCurrency', a: a};
-};
-var $author$project$Main$USD = {$: 'USD'};
-var $elm$virtual_dom$VirtualDom$style = _VirtualDom_style;
-var $elm$html$Html$Attributes$style = $elm$virtual_dom$VirtualDom$style;
-var $author$project$Main$currencySlider = function (model) {
-	var pos = function () {
-		var _v0 = model.currency;
-		switch (_v0.$) {
-			case 'USD':
-				return 0;
-			case 'JPY':
-				return 1;
-			default:
-				return 2;
-		}
-	}();
-	var translate = 'translateX(' + ($elm$core$String$fromInt(pos * 100) + '%)');
-	var optClass = function (currency) {
-		return _Utils_eq(currency, model.currency) ? 'slider-option active' : 'slider-option';
-	};
-	return A2(
-		$elm$html$Html$div,
-		_List_fromArray(
-			[
-				$elm$html$Html$Attributes$class('currency-slider')
-			]),
-		_List_fromArray(
-			[
-				A2(
-				$elm$html$Html$div,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class('slider-thumb'),
-						A2($elm$html$Html$Attributes$style, 'transform', translate)
-					]),
-				_List_Nil),
-				A2(
-				$elm$html$Html$div,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class(
-						optClass($author$project$Main$USD)),
-						$elm$html$Html$Events$onClick(
-						$author$project$Main$SelectCurrency($author$project$Main$USD))
-					]),
-				_List_fromArray(
-					[
-						$elm$html$Html$text('USD')
-					])),
-				A2(
-				$elm$html$Html$div,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class(
-						optClass($author$project$Main$JPY)),
-						$elm$html$Html$Events$onClick(
-						$author$project$Main$SelectCurrency($author$project$Main$JPY))
-					]),
-				_List_fromArray(
-					[
-						$elm$html$Html$text('JPY')
-					])),
-				A2(
-				$elm$html$Html$div,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class(
-						optClass($author$project$Main$EUR)),
-						$elm$html$Html$Events$onClick(
-						$author$project$Main$SelectCurrency($author$project$Main$EUR))
-					]),
-				_List_fromArray(
-					[
-						$elm$html$Html$text('EUR')
-					]))
-			]));
-};
-var $elm$html$Html$Events$alwaysStop = function (x) {
-	return _Utils_Tuple2(x, true);
-};
-var $elm$virtual_dom$VirtualDom$MayStopPropagation = function (a) {
-	return {$: 'MayStopPropagation', a: a};
-};
-var $elm$html$Html$Events$stopPropagationOn = F2(
-	function (event, decoder) {
-		return A2(
-			$elm$virtual_dom$VirtualDom$on,
-			event,
-			$elm$virtual_dom$VirtualDom$MayStopPropagation(decoder));
-	});
-var $elm$html$Html$Events$targetValue = A2(
-	$elm$json$Json$Decode$at,
-	_List_fromArray(
-		['target', 'value']),
-	$elm$json$Json$Decode$string);
-var $elm$html$Html$Events$onInput = function (tagger) {
-	return A2(
-		$elm$html$Html$Events$stopPropagationOn,
-		'input',
-		A2(
-			$elm$json$Json$Decode$map,
-			$elm$html$Html$Events$alwaysStop,
-			A2($elm$json$Json$Decode$map, tagger, $elm$html$Html$Events$targetValue)));
-};
-var $elm$html$Html$Attributes$placeholder = $elm$html$Html$Attributes$stringProperty('placeholder');
-var $author$project$Main$presetClass = F2(
-	function (model, val) {
-		return _Utils_eq(
-			model.selectedAmount,
-			$elm$core$Maybe$Just(val)) ? 'donation-btn active' : 'donation-btn';
-	});
-var $author$project$Main$donationEur = function (model) {
-	return A2(
-		$elm$html$Html$div,
-		_List_fromArray(
-			[
-				$elm$html$Html$Attributes$class('donation-card')
-			]),
-		_List_fromArray(
-			[
-				$author$project$Main$currencySlider(model),
-				A2(
-				$elm$html$Html$div,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class('donation-presets')
-					]),
-				_List_fromArray(
-					[
-						A2(
-						$elm$html$Html$button,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class(
-								A2($author$project$Main$presetClass, model, 1)),
-								$elm$html$Html$Events$onClick(
-								$author$project$Main$SelectAmount(1))
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('€1')
-							])),
-						A2(
-						$elm$html$Html$button,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class(
-								A2($author$project$Main$presetClass, model, 5)),
-								$elm$html$Html$Events$onClick(
-								$author$project$Main$SelectAmount(5))
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('€5')
-							])),
-						A2(
-						$elm$html$Html$button,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class(
-								A2($author$project$Main$presetClass, model, 10)),
-								$elm$html$Html$Events$onClick(
-								$author$project$Main$SelectAmount(10))
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('€10')
-							]))
-					])),
-				A2(
-				$elm$html$Html$div,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class('donation-custom')
-					]),
-				_List_fromArray(
-					[
-						A2(
-						$elm$html$Html$input,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class('custom-input'),
-								$elm$html$Html$Attributes$type_('number'),
-								$elm$html$Html$Attributes$placeholder('€ (custom)'),
-								$elm$html$Html$Events$onInput($author$project$Main$UpdateCustomAmount)
-							]),
-						_List_Nil)
-					])),
-				A2(
-				$elm$html$Html$button,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class('donate-btn'),
-						$elm$html$Html$Events$onClick($author$project$Main$SquareDonateClick)
-					]),
-				_List_fromArray(
-					[
-						$elm$html$Html$text('EUR is not supported yet')
-					]))
-			]));
-};
-var $author$project$Main$donationJpy = function (model) {
-	return A2(
-		$elm$html$Html$div,
-		_List_fromArray(
-			[
-				$elm$html$Html$Attributes$class('donation-card')
-			]),
-		_List_fromArray(
-			[
-				$author$project$Main$currencySlider(model),
-				A2(
-				$elm$html$Html$div,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class('donation-presets')
-					]),
-				_List_fromArray(
-					[
-						A2(
-						$elm$html$Html$button,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class(
-								A2($author$project$Main$presetClass, model, 100)),
-								$elm$html$Html$Events$onClick(
-								$author$project$Main$SelectAmount(100))
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('¥100')
-							])),
-						A2(
-						$elm$html$Html$button,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class(
-								A2($author$project$Main$presetClass, model, 500)),
-								$elm$html$Html$Events$onClick(
-								$author$project$Main$SelectAmount(500))
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('¥500')
-							])),
-						A2(
-						$elm$html$Html$button,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class(
-								A2($author$project$Main$presetClass, model, 1000)),
-								$elm$html$Html$Events$onClick(
-								$author$project$Main$SelectAmount(1000))
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('¥1000')
-							]))
-					])),
-				A2(
-				$elm$html$Html$div,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class('donation-custom')
-					]),
-				_List_fromArray(
-					[
-						A2(
-						$elm$html$Html$input,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class('custom-input'),
-								$elm$html$Html$Attributes$type_('number'),
-								$elm$html$Html$Attributes$placeholder('¥ (custom)'),
-								$elm$html$Html$Events$onInput($author$project$Main$UpdateCustomAmount)
-							]),
-						_List_Nil)
-					])),
-				A2(
-				$elm$html$Html$button,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class('donate-btn'),
-						$elm$html$Html$Events$onClick($author$project$Main$SquareDonateClick)
-					]),
-				_List_fromArray(
-					[
-						$elm$html$Html$text('Support via Square')
-					]))
-			]));
-};
-var $author$project$Main$donationUsd = function (model) {
-	return A2(
-		$elm$html$Html$div,
-		_List_fromArray(
-			[
-				$elm$html$Html$Attributes$class('donation-card')
-			]),
-		_List_fromArray(
-			[
-				$author$project$Main$currencySlider(model),
-				A2(
-				$elm$html$Html$div,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class('donation-presets')
-					]),
-				_List_fromArray(
-					[
-						A2(
-						$elm$html$Html$button,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class(
-								A2($author$project$Main$presetClass, model, 1)),
-								$elm$html$Html$Events$onClick(
-								$author$project$Main$SelectAmount(1))
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('$1')
-							])),
-						A2(
-						$elm$html$Html$button,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class(
-								A2($author$project$Main$presetClass, model, 5)),
-								$elm$html$Html$Events$onClick(
-								$author$project$Main$SelectAmount(5))
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('$5')
-							])),
-						A2(
-						$elm$html$Html$button,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class(
-								A2($author$project$Main$presetClass, model, 10)),
-								$elm$html$Html$Events$onClick(
-								$author$project$Main$SelectAmount(10))
-							]),
-						_List_fromArray(
-							[
-								$elm$html$Html$text('$10')
-							]))
-					])),
-				A2(
-				$elm$html$Html$div,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class('donation-custom')
-					]),
-				_List_fromArray(
-					[
-						A2(
-						$elm$html$Html$input,
-						_List_fromArray(
-							[
-								$elm$html$Html$Attributes$class('custom-input'),
-								$elm$html$Html$Attributes$type_('number'),
-								$elm$html$Html$Attributes$placeholder('$ (custom)'),
-								$elm$html$Html$Events$onInput($author$project$Main$UpdateCustomAmount)
-							]),
-						_List_Nil)
-					])),
-				A2(
-				$elm$html$Html$button,
-				_List_fromArray(
-					[
-						$elm$html$Html$Attributes$class('donate-btn'),
-						$elm$html$Html$Events$onClick($author$project$Main$SquareDonateClick)
-					]),
-				_List_fromArray(
-					[
-						$elm$html$Html$text('USD is not supported yet')
-					]))
-			]));
-};
 var $author$project$Main$serviceName = function (s) {
 	switch (s.$) {
 		case 'Apple':
@@ -8733,15 +8245,7 @@ var $author$project$Main$footerView = function (model) {
 		case 'List':
 			return A2($elm$html$Html$div, _List_Nil, _List_Nil);
 		default:
-			var _v2 = model.currency;
-			switch (_v2.$) {
-				case 'USD':
-					return $author$project$Main$donationUsd(model);
-				case 'JPY':
-					return $author$project$Main$donationJpy(model);
-				default:
-					return $author$project$Main$donationEur(model);
-			}
+			return A2($elm$html$Html$div, _List_Nil, _List_Nil);
 	}
 };
 var $author$project$Main$GoDone = {$: 'GoDone'};

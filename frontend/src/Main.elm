@@ -76,10 +76,6 @@ type alias Model =
     , totalTransfers : Int
     , totalTransfersFinished : Int
     , transferDone : Bool
-    , currency : Currency
-    , selectedAmount : Maybe Int
-    , customAmount : String
-    , donationAmount : Int
     }
 
 
@@ -114,13 +110,6 @@ type Msg
     | AppleLoginAgain
     | TransferSelected
     | TransferFinished (Result Http.Error String)
-    | SelectCurrency Currency
-    | SelectAmount Int
-    | UpdateCustomAmount String
-    | DonateClick
-    | DonateResponse (Result Http.Error String)
-    | SquareDonateClick
-    | SquareDonateResponse (Result Http.Error String)
     | NoOp
 
 
@@ -227,10 +216,6 @@ init _ url key =
             , totalTransfers = 0
             , totalTransfersFinished = 0
             , transferDone = False
-            , currency = JPY
-            , selectedAmount = Just 100
-            , customAmount = ""
-            , donationAmount = 100
             }
     in
     ( model
@@ -826,61 +811,6 @@ update msg model =
                 _ ->
                     ( { model | transferDone = False }, Cmd.none )
 
-        SelectCurrency cur ->
-            let
-                defaultAmount =
-                    case cur of
-                        JPY ->
-                            100
-
-                        USD ->
-                            1
-
-                        EUR ->
-                            1
-            in
-            ( { model
-                | currency = cur
-                , selectedAmount = Just defaultAmount
-                , donationAmount = defaultAmount
-              }
-            , Cmd.none
-            )
-
-        SelectAmount amount ->
-            ( { model | selectedAmount = Just amount, donationAmount = amount }, Cmd.none )
-
-        UpdateCustomAmount str ->
-            let
-                parsed =
-                    String.toInt str |> Maybe.withDefault 0
-            in
-            ( { model
-                | customAmount = str
-                , selectedAmount = Nothing
-                , donationAmount = parsed
-              }
-            , Cmd.none
-            )
-
-        DonateClick ->
-            ( model, donateRequest model )
-
-        DonateResponse (Ok url) ->
-            ( model, Browser.Navigation.load url )
-
-        DonateResponse (Err _) ->
-            ( model, Cmd.none )
-
-        SquareDonateClick ->
-            ( model, squareDonateRequest model )
-
-        SquareDonateResponse (Ok url) ->
-            ( model, Browser.Navigation.load url )
-
-        SquareDonateResponse (Err _) ->
-            ( model, Cmd.none )
-
         NoOp ->
             ( model, Cmd.none )
 
@@ -1095,6 +1025,7 @@ bodyView model =
                 div [ class "done-container" ]
                     [ div [ class "done-loading-text" ]
                         [ text "Select playlists" ]
+                    , supportContainer
                     ]
 
             else if model.transferDone then
@@ -1252,235 +1183,22 @@ footerView model =
             div [] []
 
         Done ->
-            case model.currency of
-                USD ->
-                    donationUsd model
-
-                JPY ->
-                    donationJpy model
-
-                EUR ->
-                    donationEur model
+            div [] []
 
 
-type Currency
-    = USD
-    | JPY
-    | EUR
-
-
-currencySlider : Model -> Html Msg
-currencySlider model =
-    let
-        pos =
-            case model.currency of
-                USD ->
-                    0
-
-                JPY ->
-                    1
-
-                EUR ->
-                    2
-
-        translate =
-            "translateX(" ++ String.fromInt (pos * 100) ++ "%)"
-
-        optClass currency =
-            if currency == model.currency then
-                "slider-option active"
-
-            else
-                "slider-option"
-    in
-    div [ class "currency-slider" ]
-        [ div
-            [ class "slider-thumb"
-            , Html.Attributes.style "transform" translate
+supportContainer : Html msg
+supportContainer =
+    div [ class "support-container" ]
+        [ div [ class "support-title" ] [ text "Support RE:PLAYLIST via STRK" ]
+        , input
+            [ class "custom-input"
+            , type_ "number"
+            , placeholder "Amount (STRK)"
             ]
             []
-        , div [ class (optClass USD), onClick (SelectCurrency USD) ] [ text "USD" ]
-        , div [ class (optClass JPY), onClick (SelectCurrency JPY) ] [ text "JPY" ]
-        , div [ class (optClass EUR), onClick (SelectCurrency EUR) ] [ text "EUR" ]
+        , button [ class "donate-btn" ]
+            [ text "Send STRK" ]
         ]
-
-
-donationJpy : Model -> Html Msg
-donationJpy model =
-    div [ class "donation-card" ]
-        [ currencySlider model
-        , div [ class "donation-presets" ]
-            [ button
-                [ class (presetClass model 100)
-                , onClick (SelectAmount 100)
-                ]
-                [ text "¥100" ]
-            , button
-                [ class (presetClass model 500)
-                , onClick (SelectAmount 500)
-                ]
-                [ text "¥500" ]
-            , button
-                [ class (presetClass model 1000)
-                , onClick (SelectAmount 1000)
-                ]
-                [ text "¥1000" ]
-            ]
-        , div [ class "donation-custom" ]
-            [ input
-                [ class "custom-input"
-                , type_ "number"
-                , placeholder "¥ (custom)"
-                , onInput UpdateCustomAmount
-                ]
-                []
-            ]
-
-        -- , button [ class "donate-btn", onClick DonateClick ]
-        --     [ text "Donate via Stripe" ]
-        , button [ class "donate-btn", onClick SquareDonateClick ]
-            [ text "Support via Square" ]
-        ]
-
-
-donationUsd : Model -> Html Msg
-donationUsd model =
-    div [ class "donation-card" ]
-        [ currencySlider model
-        , div [ class "donation-presets" ]
-            [ button
-                [ class (presetClass model 1)
-                , onClick (SelectAmount 1)
-                ]
-                [ text "$1" ]
-            , button
-                [ class (presetClass model 5)
-                , onClick (SelectAmount 5)
-                ]
-                [ text "$5" ]
-            , button
-                [ class (presetClass model 10)
-                , onClick (SelectAmount 10)
-                ]
-                [ text "$10" ]
-            ]
-        , div [ class "donation-custom" ]
-            [ input
-                [ class "custom-input"
-                , type_ "number"
-                , placeholder "$ (custom)"
-                , onInput UpdateCustomAmount
-                ]
-                []
-            ]
-
-        -- , button [ class "donate-btn", onClick DonateClick ]
-        --     [ text "Donate via Stripe" ]
-        , button [ class "donate-btn", onClick SquareDonateClick ]
-            [ text "USD is not supported yet" ]
-        ]
-
-
-donationEur : Model -> Html Msg
-donationEur model =
-    div [ class "donation-card" ]
-        [ currencySlider model
-        , div [ class "donation-presets" ]
-            [ button
-                [ class (presetClass model 1)
-                , onClick (SelectAmount 1)
-                ]
-                [ text "€1" ]
-            , button
-                [ class (presetClass model 5)
-                , onClick (SelectAmount 5)
-                ]
-                [ text "€5" ]
-            , button
-                [ class (presetClass model 10)
-                , onClick (SelectAmount 10)
-                ]
-                [ text "€10" ]
-            ]
-        , div [ class "donation-custom" ]
-            [ input
-                [ class "custom-input"
-                , type_ "number"
-                , placeholder "€ (custom)"
-                , onInput UpdateCustomAmount
-                ]
-                []
-            ]
-
-        -- , button [ class "donate-btn", onClick DonateClick ]
-        --     [ text "Donate via Stripe" ]
-        , button [ class "donate-btn", onClick SquareDonateClick ]
-            [ text "EUR is not supported yet" ]
-        ]
-
-
-presetClass : Model -> Int -> String
-presetClass model val =
-    if model.selectedAmount == Just val then
-        "donation-btn active"
-
-    else
-        "donation-btn"
-
-
-donateRequest : Model -> Cmd Msg
-donateRequest model =
-    Http.post
-        { url = "/api/donate"
-        , body =
-            Http.jsonBody <|
-                E.object
-                    [ ( "amount", E.int model.donationAmount )
-                    , ( "currency"
-                      , case model.currency of
-                            USD ->
-                                E.string "usd"
-
-                            JPY ->
-                                E.string "jpy"
-
-                            EUR ->
-                                E.string "eur"
-                      )
-                    ]
-        , expect = Http.expectJson DonateResponse donateDecoder
-        }
-
-
-donateDecoder : D.Decoder String
-donateDecoder =
-    D.field "url" D.string
-
-
-squareDonateRequest : Model -> Cmd Msg
-squareDonateRequest model =
-    let
-        currencyStr =
-            case model.currency of
-                USD ->
-                    "USD"
-
-                JPY ->
-                    "JPY"
-
-                EUR ->
-                    "EUR"
-    in
-    Http.post
-        { url = "/api/square/checkout"
-        , body =
-            Http.jsonBody <|
-                E.object
-                    [ ( "amount", E.int model.donationAmount )
-                    , ( "currency", E.string currencyStr )
-                    ]
-        , expect = Http.expectJson SquareDonateResponse donateDecoder
-        }
 
 
 subscriptions model =

@@ -2,7 +2,7 @@ use actix_cors::Cors;
 use actix_files::Files;
 use actix_session::{storage::CookieSessionStore, Session, SessionMiddleware};
 use actix_web::cookie::{Key, SameSite};
-use actix_web::{get, post, route, web, App, Error, HttpResponse, HttpServer, Responder};
+use actix_web::{get, post, route, web, App, HttpResponse, HttpServer, Responder};
 use base64::{engine::general_purpose, Engine as _};
 use dotenv::dotenv;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
@@ -12,105 +12,6 @@ use std::{
     env,
     time::{SystemTime, UNIX_EPOCH},
 };
-
-#[derive(Deserialize)]
-pub struct SquareRequest {
-    amount: i64,
-    currency: String,
-}
-
-#[derive(Serialize)]
-pub struct SquareResponse {
-    url: String,
-}
-
-#[post("/api/square/checkout")]
-pub async fn create_square_checkout(
-    req: web::Json<SquareRequest>,
-) -> Result<web::Json<SquareResponse>, Error> {
-    let square_api_key = std::env::var("SQUARE_API_KEY").expect("SQUARE_API_KEY missing");
-    let location_id = std::env::var("SQUARE_LOCATION_ID").expect("SQUARE_LOCATION_ID missing");
-
-    let client = Client::new();
-
-    let body = serde_json::json!({
-        "idempotency_key": uuid::Uuid::new_v4().to_string(),
-        "quick_pay": {
-            "name": "REPLAYLIST donation",
-            "price_money": {
-                "amount": req.amount,
-                "currency": req.currency.to_uppercase()
-            },
-            "location_id": location_id
-        }
-    });
-
-    let resp = client
-        .post("https://connect.squareupsandbox.com/v2/online-checkout/payment-links")
-        .bearer_auth(square_api_key)
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| {
-            println!("Square error: {:?}", e);
-            actix_web::error::ErrorInternalServerError("Square request failed")
-        })?
-        .json::<serde_json::Value>()
-        .await
-        .map_err(|e| {
-            println!("Square JSON error: {:?}", e);
-            actix_web::error::ErrorInternalServerError("Square response decode failed")
-        })?;
-
-    let url = resp["payment_link"]["url"].as_str().unwrap().to_string();
-
-    Ok(web::Json(SquareResponse { url }))
-}
-
-#[derive(Deserialize)]
-struct DonatePayload {
-    amount: i64,
-    currency: String,
-}
-
-#[post("/api/donate")]
-async fn donate(body: web::Json<DonatePayload>) -> impl Responder {
-    let secret = std::env::var("STRIPE_SECRET_KEY").unwrap();
-
-    let params = [
-        ("mode", "payment"),
-        ("success_url", "https://replaylist.online"),
-        ("cancel_url", "https://replaylist.online"),
-        (
-            "line_items[0][price_data][currency]",
-            body.currency.as_str(),
-        ),
-        ("line_items[0][price_data][product_data][name]", "Donation"),
-        (
-            "line_items[0][price_data][unit_amount]",
-            &body.amount.to_string(),
-        ),
-        ("line_items[0][quantity]", "1"),
-    ];
-
-    let client = reqwest::Client::new();
-
-    let resp = client
-        .post("https://api.stripe.com/v1/checkout/sessions")
-        .basic_auth(secret, Some(""))
-        .form(&params)
-        .send()
-        .await;
-
-    match resp {
-        Ok(r) => {
-            let json: serde_json::Value = r.json().await.unwrap();
-            let url = json["url"].as_str().unwrap_or("").to_string();
-            HttpResponse::Ok().json(serde_json::json!({ "url": url }))
-        }
-        Err(e) => HttpResponse::InternalServerError().body(format!("stripe error: {}", e)),
-    }
-}
 
 #[derive(Deserialize)]
 struct TransferPayload {
@@ -300,12 +201,6 @@ pub async fn create_playlist_to_apple(
             .await?;
     }
     Ok(())
-}
-
-#[post("/api/apple/save_token")]
-async fn save_apple_user_token(session: Session, body: String) -> impl Responder {
-    session.insert("apple_user_token", body).unwrap();
-    HttpResponse::Ok()
 }
 
 pub async fn create_playlist_to_spotify(
@@ -1142,9 +1037,6 @@ async fn main() -> std::io::Result<()> {
             .service(transfer_to_spotify)
             .service(transfer_to_apple)
             .service(transfer_to_youtube)
-            .service(save_apple_user_token)
-            .service(donate)
-            .service(create_square_checkout)
             .service(Files::new("/", "../frontend").index_file("index.html"))
     })
     .bind(bind_addr)?
